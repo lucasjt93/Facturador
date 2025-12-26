@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Facturas{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="actions">
+        <a class="btn btn-primary" href="/invoices/new">Nueva factura</a>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Estado</th>
+                    <th>Cliente</th>
+                    <th>Fecha emisión</th>
+                    <th>Vencimiento</th>
+                    <th>Moneda</th>
+                    <th>IGI %</th>
+                    <th>Subtotal</th>
+                    <th>IGI</th>
+                    <th>Total</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for invoice in invoices %}
+                {% set totals = invoice_totals.get(invoice.id) %}
+                <tr>
+                    <td>{{ invoice.id }}</td>
+                    <td>{{ invoice.status }}</td>
+                    <td>{{ invoice.client.name if invoice.client else '' }}</td>
+                    <td>{{ invoice.issue_date }}</td>
+                    <td>{{ invoice.due_date }}</td>
+                    <td>{{ invoice.currency }}</td>
+                    <td>{{ invoice.igi_rate }}</td>
+                    <td>{{ "{:.2f}".format(totals.subtotal) if totals else "" }}</td>
+                    <td>{{ "{:.2f}".format(totals.igi) if totals else "" }}</td>
+                    <td>{{ "{:.2f}".format(totals.total) if totals else "" }}</td>
+                    <td class="table-actions"><a class="btn btn-secondary" href="/invoices/{{ invoice.id }}">Ver</a></td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="11">No hay facturas.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

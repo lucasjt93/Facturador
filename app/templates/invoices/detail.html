@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Factura {{ invoice.id }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="actions">
+        <a class="btn btn-secondary" href="/invoices">← Volver a facturas</a>
+    </div>
+    <h2>Factura #{{ invoice.id }} ({{ invoice.status }})</h2>
+    <p><strong>Cliente:</strong> {{ client.name if client else 'N/A' }}</p>
+    <p><strong>Fecha emisión:</strong> {{ invoice.issue_date }} · <strong>Vencimiento:</strong> {{ invoice.due_date }}</p>
+    <p><strong>Moneda:</strong> {{ invoice.currency }} · <strong>IGI %:</strong> {{ invoice.igi_rate }}</p>
+    {% if invoice.notes %}<p><strong>Notas:</strong> {{ invoice.notes }}</p>{% endif %}
+    {% if invoice.status == 'draft' %}
+        <form action="/invoices/{{ invoice.id }}/issue" method="post" style="margin: 12px 0;">
+            <button class="btn btn-primary" type="submit">Marcar como emitida</button>
+        </form>
+    {% endif %}
+
+    <hr>
+    <h3>Añadir línea</h3>
+    {% if invoice.status != 'draft' %}
+        <p>La factura no está en borrador; no se pueden modificar las líneas.</p>
+    {% else %}
+    <form action="{{ form_action }}" method="post">
+        <div class="field">
+            <label for="description">Descripción</label>
+            <input type="text" id="description" name="description" value="{{ form_data.description if form_data else '' }}" required>
+            {% if errors.description %}<div class="error">{{ errors.description }}</div>{% endif %}
+        </div>
+        <div class="field">
+            <label for="qty">Cantidad</label>
+            <input type="number" step="0.01" min="0" id="qty" name="qty" value="{{ form_data.qty if form_data else '1' }}">
+            {% if errors.qty %}<div class="error">{{ errors.qty }}</div>{% endif %}
+        </div>
+        <div class="field">
+            <label for="unit_price">Precio unitario</label>
+            <input type="number" step="0.01" min="0" id="unit_price" name="unit_price" value="{{ form_data.unit_price if form_data else '0' }}">
+            {% if errors.unit_price %}<div class="error">{{ errors.unit_price }}</div>{% endif %}
+        </div>
+        <div class="field">
+            <label for="discount_pct">Descuento %</label>
+            <input type="number" step="0.01" min="0" id="discount_pct" name="discount_pct" value="{{ form_data.discount_pct if form_data else '0' }}">
+            {% if errors.discount_pct %}<div class="error">{{ errors.discount_pct }}</div>{% endif %}
+        </div>
+        <div class="field">
+            <label for="sort_order">Orden</label>
+            <input type="number" min="1" id="sort_order" name="sort_order" value="{{ form_data.sort_order if form_data else '1' }}">
+            {% if errors.sort_order %}<div class="error">{{ errors.sort_order }}</div>{% endif %}
+        </div>
+        <button class="btn btn-primary" type="submit">Agregar línea</button>
+    </form>
+    {% endif %}
+
+    <h3>Líneas</h3>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Descripción</th>
+                    <th>Cantidad</th>
+                    <th>Precio unitario</th>
+                    <th>Descuento %</th>
+                    <th>Importe bruto</th>
+                    <th>Importe</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in line_amounts %}
+                {% set line = item.line %}
+                {% set line_subtotal = item.subtotal %}
+                {% set line_discount = item.discount %}
+                {% set line_total = item.total %}
+                <tr>
+                    <td>{{ line.sort_order }}</td>
+                    <td>{{ line.description }}</td>
+                    <td>{{ "{:.2f}".format(line.qty) }}</td>
+                    <td>{{ "{:.2f}".format(line.unit_price) }}</td>
+                    <td>{{ "{:.2f}".format(line.discount_pct) }}</td>
+                    <td>{{ "{:.2f}".format(line_subtotal) }}</td>
+                    <td>{{ "{:.2f}".format(line_total) }}</td>
+                    <td class="table-actions">
+                        {% if invoice.status == 'draft' %}
+                        <form action="/invoices/{{ invoice.id }}/lines/{{ line.id }}/delete" method="post" style="margin:0;">
+                            <button class="btn btn-secondary" type="submit">Eliminar</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="7">No hay líneas.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Totales</h3>
+    <p>Subtotal: {{ "{:.2f}".format(totals.subtotal) }} {{ invoice.currency }}</p>
+    <p>Descuento: {{ "{:.2f}".format(totals.discount) }} {{ invoice.currency }}</p>
+    <p>Base: {{ "{:.2f}".format(totals.base) }} {{ invoice.currency }}</p>
+    <p>IGI: {{ "{:.2f}".format(totals.igi) }} {{ invoice.currency }}</p>
+    <p><strong>Total: {{ "{:.2f}".format(totals.total) }} {{ invoice.currency }}</strong></p>
+</div>
+{% endblock %}
