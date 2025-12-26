@@ -44,11 +44,6 @@
             <input type="number" step="0.01" min="0" id="discount_pct" name="discount_pct" value="{{ form_data.discount_pct if form_data else '0' }}">
             {% if errors.discount_pct %}<div class="error">{{ errors.discount_pct }}</div>{% endif %}
         </div>
-        <div class="field">
-            <label for="sort_order">Orden</label>
-            <input type="number" min="1" id="sort_order" name="sort_order" value="{{ form_data.sort_order if form_data else '1' }}">
-            {% if errors.sort_order %}<div class="error">{{ errors.sort_order }}</div>{% endif %}
-        </div>
         <button class="btn btn-primary" type="submit">Agregar línea</button>
     </form>
     {% endif %}
@@ -75,7 +70,7 @@
                 {% set line_discount = item.discount %}
                 {% set line_total = item.total %}
                 <tr>
-                    <td>{{ line.sort_order }}</td>
+                    <td>{{ loop.index }}</td>
                     <td>{{ line.description }}</td>
                     <td>{{ "{:.2f}".format(line.qty) }}</td>
                     <td>{{ "{:.2f}".format(line.unit_price) }}</td>

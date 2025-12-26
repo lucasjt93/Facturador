@@ -15,7 +15,7 @@ app = FastAPI()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 def root() -> RedirectResponse:
     return RedirectResponse(url="/clients", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
@@ -100,7 +100,7 @@ def _parse_payment_terms_days(value: str) -> Optional[int]:
     return days
 
 
-@app.post("/clients", response_class=HTMLResponse)
+@app.post("/clients")
 def create_client(
     request: Request,
     db: Session = Depends(get_db),
@@ -220,7 +220,7 @@ def edit_client(
     )
 
 
-@app.post("/clients/{client_id}/edit", response_class=HTMLResponse)
+@app.post("/clients/{client_id}/edit")
 def update_client(
     client_id: int,
     request: Request,
@@ -315,7 +315,7 @@ def company_settings(request: Request, db: Session = Depends(get_db)) -> HTMLRes
     )
 
 
-@app.post("/company", response_class=HTMLResponse)
+@app.post("/company")
 def update_company(
     request: Request,
     db: Session = Depends(get_db),
@@ -427,18 +427,10 @@ def _validate_line_form(data: Dict[str, str]) -> Dict[str, str]:
     except Exception:
         errors["discount_pct"] = "Valor numérico inválido."
 
-    # sort_order
-    try:
-        sort_val = int(data.get("sort_order", "1"))
-        if sort_val < 1:
-            errors["sort_order"] = "El orden debe ser entero positivo."
-    except Exception:
-        errors["sort_order"] = "Valor numérico inválido."
-
     return errors
 
 
-@app.post("/invoices/{invoice_id}/lines", response_class=HTMLResponse)
+@app.post("/invoices/{invoice_id}/lines")
 def add_line(
     invoice_id: int,
     request: Request,
@@ -447,7 +439,6 @@ def add_line(
     qty: str = Form(""),
     unit_price: str = Form(""),
     discount_pct: str = Form(""),
-    sort_order: str = Form(""),
 ) -> HTMLResponse:
     invoice = (
         db.query(Invoice)
@@ -466,7 +457,6 @@ def add_line(
         "qty": qty.strip() or "1",
         "unit_price": unit_price.strip() or "0",
         "discount_pct": discount_pct.strip() or "0",
-        "sort_order": sort_order.strip() or "1",
     }
     errors = _validate_line_form(data)
     if errors:
@@ -492,13 +482,17 @@ def add_line(
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
+    next_sort_order = 1
+    if invoice.lines:
+        next_sort_order = max(line.sort_order for line in invoice.lines) + 1
+
     line = InvoiceLine(
         invoice_id=invoice.id,
         description=data["description"],
         qty=Decimal(data["qty"]),
         unit_price=Decimal(data["unit_price"]),
         discount_pct=Decimal(data["discount_pct"]),
-        sort_order=int(data["sort_order"]),
+        sort_order=next_sort_order,
     )
     db.add(line)
     db.commit()
@@ -507,7 +501,7 @@ def add_line(
     )
 
 
-@app.post("/invoices/{invoice_id}/lines/{line_id}/delete", response_class=HTMLResponse)
+@app.post("/invoices/{invoice_id}/lines/{line_id}/delete")
 def delete_line(
     invoice_id: int, line_id: int, db: Session = Depends(get_db)
 ) -> HTMLResponse:
@@ -533,16 +527,26 @@ def delete_line(
     )
 
 
-@app.post("/invoices/{invoice_id}/issue", response_class=HTMLResponse)
+@app.post("/invoices/{invoice_id}/issue")
 def issue_invoice(
     invoice_id: int, db: Session = Depends(get_db)
 ) -> HTMLResponse:
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = (
+        db.query(Invoice)
+        .options(selectinload(Invoice.lines))
+        .filter(Invoice.id == invoice_id)
+        .first()
+    )
     if not invoice:
         return HTMLResponse(content="Factura no encontrada", status_code=404)
     if invoice.status != "draft":
         return HTMLResponse(
             content="La factura ya fue emitida o no está en borrador.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    if not invoice.lines:
+        return HTMLResponse(
+            content="No se puede emitir una factura sin líneas.",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -624,7 +628,7 @@ def _validate_invoice_form(data: Dict[str, str], db: Session) -> Dict[str, str]:
     return errors
 
 
-@app.post("/invoices/new", response_class=HTMLResponse)
+@app.post("/invoices/new")
 def create_invoice(
     request: Request,
     db: Session = Depends(get_db),
