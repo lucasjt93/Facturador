@@ -17,6 +17,9 @@
             <button class="btn btn-primary" type="submit">Marcar como emitida</button>
         </form>
     {% endif %}
+    <form action="/invoices/{{ invoice.id }}/delete" method="post" style="margin: 12px 0;" onsubmit="return confirm('¿Eliminar factura? Esta acción no se puede deshacer.');">
+        <button class="btn btn-secondary" type="submit">Eliminar factura</button>
+    </form>
 
     <hr>
     <h3>Añadir línea</h3>
