@@ -1,0 +1,18 @@
+# Python / virtualenv
+.venv/
+env/
+*.pyc
+__pycache__/
+.pytest_cache/
+
+# Editors / IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local data
+app.db
+

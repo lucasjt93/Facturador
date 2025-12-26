@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="actions">
+        <a class="btn btn-secondary" href="/clients">← Volver a clientes</a>
+    </div>
+    <h2>{{ form_title }}</h2>
+    <form action="{{ form_action }}" method="post">
+        <div class="field">
+            <label for="name">Nombre</label>
+            <input type="text" id="name" name="name" value="{{ company.name }}" required>
+            {% if errors.name %}<div class="error">{{ errors.name }}</div>{% endif %}
+        </div>
+        <div class="field">
+            <label for="tax_id">NIF / NRT / Tax ID</label>
+            <input type="text" id="tax_id" name="tax_id" value="{{ company.tax_id }}">
+        </div>
+        <div class="field">
+            <label for="phone">Teléfono</label>
+            <input type="text" id="phone" name="phone" value="{{ company.phone }}">
+        </div>
+        <div class="field">
+            <label for="address_line1">Dirección (línea 1)</label>
+            <input type="text" id="address_line1" name="address_line1" value="{{ company.address_line1 }}">
+        </div>
+        <div class="field">
+            <label for="address_line2">Dirección (línea 2)</label>
+            <input type="text" id="address_line2" name="address_line2" value="{{ company.address_line2 }}">
+        </div>
+        <div class="field">
+            <label for="city">Ciudad / Provincia</label>
+            <input type="text" id="city" name="city" value="{{ company.city }}">
+        </div>
+        <div class="field">
+            <label for="postal_code">Código postal</label>
+            <input type="text" id="postal_code" name="postal_code" value="{{ company.postal_code }}">
+        </div>
+        <div class="field">
+            <label for="country">País</label>
+            <input type="text" id="country" name="country" value="{{ company.country }}">
+        </div>
+        <div class="field">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="{{ company.email }}">
+        </div>
+        <div class="field">
+            <label for="bank_account">IBAN / Cuenta bancaria</label>
+            <input type="text" id="bank_account" name="bank_account" value="{{ company.bank_account }}">
+        </div>
+        <div class="field">
+            <label for="bank_swift">SWIFT / BIC</label>
+            <input type="text" id="bank_swift" name="bank_swift" value="{{ company.bank_swift }}">
+        </div>
+        <div class="field">
+            <label for="payment_terms_days">Términos de pago (días)</label>
+            <input type="number" min="0" id="payment_terms_days" name="payment_terms_days" value="{{ company.payment_terms_days }}">
+            {% if errors.payment_terms_days %}<div class="error">{{ errors.payment_terms_days }}</div>{% endif %}
+        </div>
+        <div class="field">
+            <label for="notes">Notas / Observaciones</label>
+            <input type="text" id="notes" name="notes" value="{{ company.notes }}">
+        </div>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+    </form>
+</div>
+{% endblock %}

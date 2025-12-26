@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Clientes{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="actions">
+        <a class="btn btn-primary" href="/clients/new">Nuevo cliente</a>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>RFC / Tax ID</th>
+                    <th>Dirección</th>
+                    <th>Ciudad</th>
+                    <th>Código postal</th>
+                    <th>País</th>
+                    <th>Teléfono</th>
+                    <th>Pago (días)</th>
+                    <th>Email</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for client in clients %}
+                <tr>
+                    <td>{{ client.id }}</td>
+                    <td>{{ client.name }}</td>
+                    <td>{{ client.tax_id }}</td>
+                    <td>
+                        {{ client.address_line1 or client.address or "" }}{% if client.address_line2 %}<br>{{ client.address_line2 }}{% endif %}
+                    </td>
+                    <td>{{ client.city }}</td>
+                    <td>{{ client.postal_code }}</td>
+                    <td>{{ client.country }}</td>
+                    <td>{{ client.phone }}</td>
+                    <td>
+                        {% set effective = effective_payment_terms_days.get(client.id) %}
+                        {% if client.payment_terms_days is not none %}
+                            {{ client.payment_terms_days }}
+                        {% elif effective is not none %}
+                            {{ effective }} (predeterminado)
+                        {% endif %}
+                    </td>
+                    <td>{{ client.email }}</td>
+                    <td class="table-actions"><a class="btn btn-secondary" href="/clients/{{ client.id }}/edit">Editar</a></td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="11">No hay clientes registrados.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
