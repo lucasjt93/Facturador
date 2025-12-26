@@ -55,6 +55,12 @@ class Invoice(Base):
     notes = Column(String(500), nullable=True)
 
     client = relationship("Client")
+    lines = relationship(
+        "InvoiceLine",
+        cascade="all, delete-orphan",
+        back_populates="invoice",
+        order_by="InvoiceLine.sort_order",
+    )
 
 
 class InvoiceLine(Base):
@@ -68,4 +74,4 @@ class InvoiceLine(Base):
     discount_pct = Column(Numeric(5, 2), nullable=False, default=0)
     sort_order = Column(Integer, nullable=False, default=1)
 
-    invoice = relationship("Invoice", backref="lines")
+    invoice = relationship("Invoice", back_populates="lines")

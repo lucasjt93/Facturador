@@ -359,14 +359,42 @@ def _invoice_status_guard(invoice: Invoice) -> Optional[HTMLResponse]:
 
 def _validate_line_form(data: Dict[str, str]) -> Dict[str, str]:
     errors: Dict[str, str] = {}
-    if not data.get("description", "").strip():
+    desc = data.get("description", "").strip()
+    if not desc:
         errors["description"] = "La descripción es obligatoria."
-    for key in ["qty", "unit_price", "discount_pct", "sort_order"]:
-        if data.get(key):
-            try:
-                Decimal(data[key])
-            except Exception:
-                errors[key] = "Valor numérico inválido."
+    elif len(desc) > 500:
+        errors["description"] = "Máximo 500 caracteres."
+
+    # qty
+    try:
+        qty_val = Decimal(data.get("qty", "0"))
+        if qty_val <= 0:
+            errors["qty"] = "La cantidad debe ser mayor a 0."
+    except Exception:
+        errors["qty"] = "Valor numérico inválido."
+
+    # unit_price
+    try:
+        price_val = Decimal(data.get("unit_price", "0"))
+        if price_val < 0:
+            errors["unit_price"] = "El precio no puede ser negativo."
+    except Exception:
+        errors["unit_price"] = "Valor numérico inválido."
+
+    # discount_pct
+    try:
+        disc_val = Decimal(data.get("discount_pct", "0"))
+        if disc_val < 0 or disc_val > 100:
+            errors["discount_pct"] = "El descuento debe estar entre 0 y 100."
+    except Exception:
+        errors["discount_pct"] = "Valor numérico inválido."
+
+    # sort_order
+    try:
+        Decimal(data.get("sort_order", "1"))
+    except Exception:
+        errors["sort_order"] = "Valor numérico inválido."
+
     return errors
 
 
