@@ -5,6 +5,7 @@ from typing import Dict, Optional
 from fastapi import Depends, FastAPI, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import desc
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from .database import get_db
@@ -22,7 +23,7 @@ def root() -> RedirectResponse:
 
 @app.get("/clients", response_class=HTMLResponse)
 def list_clients(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-    clients = db.query(Client).order_by(Client.name).all()
+    clients = db.query(Client).order_by(desc(Client.id)).all()
     company = _get_company(db)
     effective_terms = {
         client.id: _effective_payment_terms_days(client, company) for client in clients
@@ -718,3 +719,35 @@ def invoice_detail(
             "form_action": f"/invoices/{invoice.id}/lines",
         },
     )
+
+
+@app.post("/clients/{client_id}/delete")
+def delete_client(
+    client_id: int, request: Request, db: Session = Depends(get_db)
+) -> HTMLResponse:
+    client = _get_client(db, client_id)
+    if not client:
+        return HTMLResponse(content="Cliente no encontrado", status_code=404)
+    has_invoices = db.query(Invoice).filter(Invoice.client_id == client_id).first()
+    if has_invoices:
+        return templates.TemplateResponse(
+            "error.html",
+            {
+                "request": request,
+                "message": "No se puede eliminar el cliente porque tiene facturas asociadas.",
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    db.delete(client)
+    db.commit()
+    return RedirectResponse(url="/clients", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/invoices/{invoice_id}/delete")
+def delete_invoice(invoice_id: int, db: Session = Depends(get_db)) -> HTMLResponse:
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not invoice:
+        return HTMLResponse(content="Factura no encontrada", status_code=404)
+    db.delete(invoice)
+    db.commit()
+    return RedirectResponse(url="/invoices", status_code=status.HTTP_303_SEE_OTHER)

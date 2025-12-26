@@ -21,12 +21,13 @@
                     <th>Teléfono</th>
                     <th>Pago (días)</th>
                     <th>Email</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for client in clients %}
-                <tr>
+                <th>Editar</th>
+                <th>Eliminar</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for client in clients %}
+            <tr>
                     <td>{{ client.id }}</td>
                     <td>{{ client.name }}</td>
                     <td>{{ client.tax_id }}</td>
@@ -37,24 +38,29 @@
                     <td>{{ client.postal_code }}</td>
                     <td>{{ client.country }}</td>
                     <td>{{ client.phone }}</td>
-                    <td>
-                        {% set effective = effective_payment_terms_days.get(client.id) %}
-                        {% if client.payment_terms_days is not none %}
-                            {{ client.payment_terms_days }}
-                        {% elif effective is not none %}
-                            {{ effective }} (predeterminado)
-                        {% endif %}
-                    </td>
-                    <td>{{ client.email }}</td>
-                    <td class="table-actions"><a class="btn btn-secondary" href="/clients/{{ client.id }}/edit">Editar</a></td>
-                </tr>
-            {% else %}
-                <tr>
-                    <td colspan="11">No hay clientes registrados.</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                <td>
+                    {% set effective = effective_payment_terms_days.get(client.id) %}
+                    {% if client.payment_terms_days is not none %}
+                        {{ client.payment_terms_days }}
+                    {% elif effective is not none %}
+                        {{ effective }} (predeterminado)
+                    {% endif %}
+                </td>
+                <td>{{ client.email }}</td>
+                <td class="table-actions"><a class="btn btn-secondary" href="/clients/{{ client.id }}/edit">Editar</a></td>
+                <td class="table-actions">
+                    <form action="/clients/{{ client.id }}/delete" method="post" style="margin:0;" onsubmit="return confirm('¿Eliminar cliente?');">
+                        <button class="btn btn-danger" type="submit">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="12">No hay clientes registrados.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
 </div>
 {% endblock %}
