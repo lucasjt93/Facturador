@@ -107,6 +107,16 @@
             background: #fff;
             font-size: 15px;
         }
+        input[type="date"], input[type="number"], select, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #fff;
+            font-size: 15px;
+            font-family: inherit;
+        }
+        textarea { min-height: 90px; resize: vertical; }
         .field {
             display: flex;
             flex-direction: column;
@@ -123,6 +133,7 @@
         <div><a href="/clients">Facturador</a></div>
         <div class="nav-links">
             <a href="/clients">Clientes</a>
+            <a href="/invoices">Facturas</a>
             <a href="/company">Mi empresa</a>
         </div>
     </header>

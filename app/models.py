@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Date, ForeignKey, Integer, Numeric, String
+from sqlalchemy.orm import relationship
 
 from .database import Base
 
@@ -37,3 +38,34 @@ class Company(Base):
     bank_swift = Column(String(255), nullable=True)
     payment_terms_days = Column(Integer, nullable=True)
     notes = Column(String(500), nullable=True)
+
+
+class Invoice(Base):
+    __tablename__ = "invoices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    status = Column(String(20), nullable=False, default="draft")
+    series = Column(String(20), nullable=True)
+    number = Column(String(20), nullable=True)
+    issue_date = Column(Date, nullable=False)
+    due_date = Column(Date, nullable=False)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    currency = Column(String(10), nullable=False, default="EUR")
+    igi_rate = Column(Numeric(5, 2), nullable=False, default=0)
+    notes = Column(String(500), nullable=True)
+
+    client = relationship("Client")
+
+
+class InvoiceLine(Base):
+    __tablename__ = "invoice_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    description = Column(String(500), nullable=False)
+    qty = Column(Numeric(12, 2), nullable=False, default=1)
+    unit_price = Column(Numeric(12, 2), nullable=False, default=0)
+    discount_pct = Column(Numeric(5, 2), nullable=False, default=0)
+    sort_order = Column(Integer, nullable=False, default=1)
+
+    invoice = relationship("Invoice", backref="lines")
