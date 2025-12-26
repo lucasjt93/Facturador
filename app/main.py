@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Dict, Optional
 
-from fastapi import Depends, FastAPI, Request, status
+from fastapi import Depends, FastAPI, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -16,12 +16,12 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 @app.get("/", response_class=HTMLResponse)
-async def root() -> RedirectResponse:
+def root() -> RedirectResponse:
     return RedirectResponse(url="/clients", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
 @app.get("/clients", response_class=HTMLResponse)
-async def list_clients(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+def list_clients(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     clients = db.query(Client).order_by(Client.name).all()
     company = _get_company(db)
     effective_terms = {
@@ -39,7 +39,7 @@ async def list_clients(request: Request, db: Session = Depends(get_db)) -> HTMLR
 
 
 @app.get("/clients/new", response_class=HTMLResponse)
-async def new_client(request: Request) -> HTMLResponse:
+def new_client(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         "clients/form.html",
         {
@@ -101,19 +101,31 @@ def _parse_payment_terms_days(value: str) -> Optional[int]:
 
 
 @app.post("/clients", response_class=HTMLResponse)
-async def create_client(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-    form = await request.form()
+def create_client(
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(""),
+    tax_id: str = Form(""),
+    address_line1: str = Form(""),
+    address_line2: str = Form(""),
+    city: str = Form(""),
+    postal_code: str = Form(""),
+    country: str = Form(""),
+    phone: str = Form(""),
+    email: str = Form(""),
+    payment_terms_days: str = Form(""),
+) -> HTMLResponse:
     data = {
-        "name": form.get("name", "").strip(),
-        "tax_id": form.get("tax_id", "").strip(),
-        "address_line1": form.get("address_line1", "").strip(),
-        "address_line2": form.get("address_line2", "").strip(),
-        "city": form.get("city", "").strip(),
-        "postal_code": form.get("postal_code", "").strip(),
-        "country": form.get("country", "").strip(),
-        "phone": form.get("phone", "").strip(),
-        "email": form.get("email", "").strip(),
-        "payment_terms_days": form.get("payment_terms_days", "").strip(),
+        "name": name.strip(),
+        "tax_id": tax_id.strip(),
+        "address_line1": address_line1.strip(),
+        "address_line2": address_line2.strip(),
+        "city": city.strip(),
+        "postal_code": postal_code.strip(),
+        "country": country.strip(),
+        "phone": phone.strip(),
+        "email": email.strip(),
+        "payment_terms_days": payment_terms_days.strip(),
     }
     errors = _validate_client_form(data)
     if errors:
@@ -177,7 +189,7 @@ def _parse_date(value: str) -> date:
 
 
 @app.get("/clients/{client_id}/edit", response_class=HTMLResponse)
-async def edit_client(
+def edit_client(
     client_id: int, request: Request, db: Session = Depends(get_db)
 ) -> HTMLResponse:
     client = _get_client(db, client_id)
@@ -209,25 +221,36 @@ async def edit_client(
 
 
 @app.post("/clients/{client_id}/edit", response_class=HTMLResponse)
-async def update_client(
-    client_id: int, request: Request, db: Session = Depends(get_db)
+def update_client(
+    client_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(""),
+    tax_id: str = Form(""),
+    address_line1: str = Form(""),
+    address_line2: str = Form(""),
+    city: str = Form(""),
+    postal_code: str = Form(""),
+    country: str = Form(""),
+    phone: str = Form(""),
+    email: str = Form(""),
+    payment_terms_days: str = Form(""),
 ) -> HTMLResponse:
     client = _get_client(db, client_id)
     if not client:
         return HTMLResponse(content="Cliente no encontrado", status_code=404)
 
-    form = await request.form()
     data = {
-        "name": form.get("name", "").strip(),
-        "tax_id": form.get("tax_id", "").strip(),
-        "address_line1": form.get("address_line1", "").strip(),
-        "address_line2": form.get("address_line2", "").strip(),
-        "city": form.get("city", "").strip(),
-        "postal_code": form.get("postal_code", "").strip(),
-        "country": form.get("country", "").strip(),
-        "phone": form.get("phone", "").strip(),
-        "email": form.get("email", "").strip(),
-        "payment_terms_days": form.get("payment_terms_days", "").strip(),
+        "name": name.strip(),
+        "tax_id": tax_id.strip(),
+        "address_line1": address_line1.strip(),
+        "address_line2": address_line2.strip(),
+        "city": city.strip(),
+        "postal_code": postal_code.strip(),
+        "country": country.strip(),
+        "phone": phone.strip(),
+        "email": email.strip(),
+        "payment_terms_days": payment_terms_days.strip(),
     }
     errors = _validate_client_form(data)
     if errors:
@@ -263,7 +286,7 @@ async def update_client(
 
 
 @app.get("/company", response_class=HTMLResponse)
-async def company_settings(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+def company_settings(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     company = _get_company(db)
     company_data = {
         "name": company.name if company else "",
@@ -293,22 +316,37 @@ async def company_settings(request: Request, db: Session = Depends(get_db)) -> H
 
 
 @app.post("/company", response_class=HTMLResponse)
-async def update_company(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-    form = await request.form()
+def update_company(
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(""),
+    tax_id: str = Form(""),
+    phone: str = Form(""),
+    address_line1: str = Form(""),
+    address_line2: str = Form(""),
+    city: str = Form(""),
+    postal_code: str = Form(""),
+    country: str = Form(""),
+    email: str = Form(""),
+    bank_account: str = Form(""),
+    bank_swift: str = Form(""),
+    payment_terms_days: str = Form(""),
+    notes: str = Form(""),
+) -> HTMLResponse:
     data = {
-        "name": form.get("name", "").strip(),
-        "tax_id": form.get("tax_id", "").strip(),
-        "phone": form.get("phone", "").strip(),
-        "address_line1": form.get("address_line1", "").strip(),
-        "address_line2": form.get("address_line2", "").strip(),
-        "city": form.get("city", "").strip(),
-        "postal_code": form.get("postal_code", "").strip(),
-        "country": form.get("country", "").strip(),
-        "email": form.get("email", "").strip(),
-        "bank_account": form.get("bank_account", "").strip(),
-        "bank_swift": form.get("bank_swift", "").strip(),
-        "payment_terms_days": form.get("payment_terms_days", "").strip(),
-        "notes": form.get("notes", "").strip(),
+        "name": name.strip(),
+        "tax_id": tax_id.strip(),
+        "phone": phone.strip(),
+        "address_line1": address_line1.strip(),
+        "address_line2": address_line2.strip(),
+        "city": city.strip(),
+        "postal_code": postal_code.strip(),
+        "country": country.strip(),
+        "email": email.strip(),
+        "bank_account": bank_account.strip(),
+        "bank_swift": bank_swift.strip(),
+        "payment_terms_days": payment_terms_days.strip(),
+        "notes": notes.strip(),
     }
     errors = _validate_company_form(data)
     if errors:
@@ -401,8 +439,15 @@ def _validate_line_form(data: Dict[str, str]) -> Dict[str, str]:
 
 
 @app.post("/invoices/{invoice_id}/lines", response_class=HTMLResponse)
-async def add_line(
-    invoice_id: int, request: Request, db: Session = Depends(get_db)
+def add_line(
+    invoice_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    description: str = Form(""),
+    qty: str = Form(""),
+    unit_price: str = Form(""),
+    discount_pct: str = Form(""),
+    sort_order: str = Form(""),
 ) -> HTMLResponse:
     invoice = (
         db.query(Invoice)
@@ -416,13 +461,12 @@ async def add_line(
     if guard:
         return guard
 
-    form = await request.form()
     data = {
-        "description": form.get("description", "").strip(),
-        "qty": form.get("qty", "").strip() or "1",
-        "unit_price": form.get("unit_price", "").strip() or "0",
-        "discount_pct": form.get("discount_pct", "").strip() or "0",
-        "sort_order": form.get("sort_order", "").strip() or "1",
+        "description": description.strip(),
+        "qty": qty.strip() or "1",
+        "unit_price": unit_price.strip() or "0",
+        "discount_pct": discount_pct.strip() or "0",
+        "sort_order": sort_order.strip() or "1",
     }
     errors = _validate_line_form(data)
     if errors:
@@ -464,7 +508,7 @@ async def add_line(
 
 
 @app.post("/invoices/{invoice_id}/lines/{line_id}/delete", response_class=HTMLResponse)
-async def delete_line(
+def delete_line(
     invoice_id: int, line_id: int, db: Session = Depends(get_db)
 ) -> HTMLResponse:
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
@@ -490,7 +534,7 @@ async def delete_line(
 
 
 @app.post("/invoices/{invoice_id}/issue", response_class=HTMLResponse)
-async def issue_invoice(
+def issue_invoice(
     invoice_id: int, db: Session = Depends(get_db)
 ) -> HTMLResponse:
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
@@ -510,7 +554,7 @@ async def issue_invoice(
 
 
 @app.get("/invoices", response_class=HTMLResponse)
-async def list_invoices(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+def list_invoices(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     invoices = (
         db.query(Invoice)
         .options(joinedload(Invoice.client), selectinload(Invoice.lines))
@@ -528,7 +572,7 @@ async def list_invoices(request: Request, db: Session = Depends(get_db)) -> HTML
 
 
 @app.get("/invoices/new", response_class=HTMLResponse)
-async def new_invoice(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+def new_invoice(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     clients = db.query(Client).order_by(Client.name).all()
     today_str = date.today().isoformat()
     return templates.TemplateResponse(
@@ -581,14 +625,21 @@ def _validate_invoice_form(data: Dict[str, str], db: Session) -> Dict[str, str]:
 
 
 @app.post("/invoices/new", response_class=HTMLResponse)
-async def create_invoice(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-    form = await request.form()
+def create_invoice(
+    request: Request,
+    db: Session = Depends(get_db),
+    client_id: str = Form(""),
+    issue_date: str = Form(""),
+    currency: str = Form("EUR"),
+    igi_rate: str = Form(""),
+    notes: str = Form(""),
+) -> HTMLResponse:
     data = {
-        "client_id": form.get("client_id", "").strip(),
-        "issue_date": form.get("issue_date", "").strip(),
-        "currency": form.get("currency", "EUR").strip() or "EUR",
-        "igi_rate": form.get("igi_rate", "").strip(),
-        "notes": form.get("notes", "").strip(),
+        "client_id": client_id.strip(),
+        "issue_date": issue_date.strip(),
+        "currency": currency.strip() or "EUR",
+        "igi_rate": igi_rate.strip(),
+        "notes": notes.strip(),
     }
     clients = db.query(Client).order_by(Client.name).all()
     errors = _validate_invoice_form(data, db)
@@ -632,7 +683,7 @@ async def create_invoice(request: Request, db: Session = Depends(get_db)) -> HTM
 
 
 @app.get("/invoices/{invoice_id}", response_class=HTMLResponse)
-async def invoice_detail(
+def invoice_detail(
     invoice_id: int, request: Request, db: Session = Depends(get_db)
 ) -> HTMLResponse:
     invoice = (
