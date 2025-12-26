@@ -201,7 +201,7 @@ async def edit_client(
                 "country": client.country or "",
                 "phone": client.phone or "",
                 "email": client.email or "",
-                "payment_terms_days": client.payment_terms_days or "",
+                "payment_terms_days": "" if client.payment_terms_days is None else client.payment_terms_days,
             },
             "errors": {},
         },
@@ -277,7 +277,7 @@ async def company_settings(request: Request, db: Session = Depends(get_db)) -> H
         "email": company.email if company else "",
         "bank_account": company.bank_account if company else "",
         "bank_swift": company.bank_swift if company else "",
-        "payment_terms_days": company.payment_terms_days if company else "",
+        "payment_terms_days": "" if not company or company.payment_terms_days is None else company.payment_terms_days,
         "notes": company.notes if company else "",
     }
     return templates.TemplateResponse(
@@ -391,7 +391,9 @@ def _validate_line_form(data: Dict[str, str]) -> Dict[str, str]:
 
     # sort_order
     try:
-        Decimal(data.get("sort_order", "1"))
+        sort_val = int(data.get("sort_order", "1"))
+        if sort_val < 1:
+            errors["sort_order"] = "El orden debe ser entero positivo."
     except Exception:
         errors["sort_order"] = "Valor numérico inválido."
 
@@ -424,7 +426,6 @@ async def add_line(
     }
     errors = _validate_line_form(data)
     if errors:
-        client = _get_client(db, invoice.client_id)
         lines = sorted(invoice.lines, key=lambda l: (l.sort_order, l.id))
         totals = compute_totals(invoice, lines)
         line_amounts = [
@@ -436,7 +437,7 @@ async def add_line(
             {
                 "request": request,
                 "invoice": invoice,
-                "client": client,
+                "client": invoice.client,
                 "lines": lines,
                 "line_amounts": line_amounts,
                 "totals": totals,
@@ -453,7 +454,7 @@ async def add_line(
         qty=Decimal(data["qty"]),
         unit_price=Decimal(data["unit_price"]),
         discount_pct=Decimal(data["discount_pct"]),
-        sort_order=int(Decimal(data["sort_order"])),
+        sort_order=int(data["sort_order"]),
     )
     db.add(line)
     db.commit()
@@ -512,18 +513,13 @@ async def issue_invoice(
 async def list_invoices(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     invoices = (
         db.query(Invoice)
-        .options(joinedload(Invoice.client))
+        .options(joinedload(Invoice.client), selectinload(Invoice.lines))
         .order_by(Invoice.issue_date.desc(), Invoice.id.desc())
         .all()
     )
     invoice_totals = {}
     for inv in invoices:
-        lines = (
-            db.query(InvoiceLine)
-            .filter(InvoiceLine.invoice_id == inv.id)
-            .order_by(InvoiceLine.sort_order, InvoiceLine.id)
-            .all()
-        )
+        lines = sorted(inv.lines, key=lambda l: (l.sort_order, l.id))
         invoice_totals[inv.id] = compute_totals(inv, lines)
     return templates.TemplateResponse(
         "invoices/list.html",
@@ -639,11 +635,15 @@ async def create_invoice(request: Request, db: Session = Depends(get_db)) -> HTM
 async def invoice_detail(
     invoice_id: int, request: Request, db: Session = Depends(get_db)
 ) -> HTMLResponse:
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = (
+        db.query(Invoice)
+        .options(joinedload(Invoice.client), selectinload(Invoice.lines))
+        .filter(Invoice.id == invoice_id)
+        .first()
+    )
     if not invoice:
         return HTMLResponse(content="Factura no encontrada", status_code=404)
 
-    client = _get_client(db, invoice.client_id)
     lines = sorted(invoice.lines, key=lambda l: (l.sort_order, l.id))
     line_amounts = [
         {"line": line, "subtotal": ls, "discount": ld, "total": lt}
@@ -655,7 +655,7 @@ async def invoice_detail(
         {
             "request": request,
             "invoice": invoice,
-            "client": client,
+            "client": invoice.client,
             "lines": lines,
             "line_amounts": line_amounts,
             "totals": totals,
