@@ -5,11 +5,11 @@ from typing import Dict, Optional
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from .database import get_db
 from .models import Client, Company, Invoice, InvoiceLine
-from .services import compute_totals
+from .services import compute_line_amounts, compute_totals
 
 app = FastAPI()
 templates = Jinja2Templates(directory="app/templates")
@@ -402,7 +402,12 @@ def _validate_line_form(data: Dict[str, str]) -> Dict[str, str]:
 async def add_line(
     invoice_id: int, request: Request, db: Session = Depends(get_db)
 ) -> HTMLResponse:
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    invoice = (
+        db.query(Invoice)
+        .options(joinedload(Invoice.client), selectinload(Invoice.lines))
+        .filter(Invoice.id == invoice_id)
+        .first()
+    )
     if not invoice:
         return HTMLResponse(content="Factura no encontrada", status_code=404)
     guard = _invoice_status_guard(invoice)
@@ -420,29 +425,12 @@ async def add_line(
     errors = _validate_line_form(data)
     if errors:
         client = _get_client(db, invoice.client_id)
-        lines = (
-            db.query(InvoiceLine)
-            .filter(InvoiceLine.invoice_id == invoice.id)
-            .order_by(InvoiceLine.sort_order, InvoiceLine.id)
-            .all()
-        )
+        lines = sorted(invoice.lines, key=lambda l: (l.sort_order, l.id))
         totals = compute_totals(invoice, lines)
-        line_amounts = []
-        for ln in lines:
-            qty = Decimal(ln.qty or 0)
-            price = Decimal(ln.unit_price or 0)
-            discount_pct = Decimal(ln.discount_pct or 0)
-            line_subtotal = qty * price
-            line_discount = line_subtotal * (discount_pct / Decimal("100"))
-            line_total = line_subtotal - line_discount
-            line_amounts.append(
-                {
-                    "line": ln,
-                    "subtotal": line_subtotal,
-                    "discount": line_discount,
-                    "total": line_total,
-                }
-            )
+        line_amounts = [
+            {"line": ln, "subtotal": ls, "discount": ld, "total": lt}
+            for ln, ls, ld, lt in compute_line_amounts(lines)
+        ]
         return templates.TemplateResponse(
             "invoices/detail.html",
             {
@@ -524,6 +512,7 @@ async def issue_invoice(
 async def list_invoices(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     invoices = (
         db.query(Invoice)
+        .options(joinedload(Invoice.client))
         .order_by(Invoice.issue_date.desc(), Invoice.id.desc())
         .all()
     )
@@ -655,29 +644,12 @@ async def invoice_detail(
         return HTMLResponse(content="Factura no encontrada", status_code=404)
 
     client = _get_client(db, invoice.client_id)
-    lines = (
-        db.query(InvoiceLine)
-        .filter(InvoiceLine.invoice_id == invoice.id)
-        .order_by(InvoiceLine.sort_order, InvoiceLine.id)
-        .all()
-    )
+    lines = sorted(invoice.lines, key=lambda l: (l.sort_order, l.id))
+    line_amounts = [
+        {"line": line, "subtotal": ls, "discount": ld, "total": lt}
+        for line, ls, ld, lt in compute_line_amounts(lines)
+    ]
     totals = compute_totals(invoice, lines)
-    line_amounts = []
-    for line in lines:
-        qty = Decimal(line.qty or 0)
-        price = Decimal(line.unit_price or 0)
-        discount_pct = Decimal(line.discount_pct or 0)
-        line_subtotal = qty * price
-        line_discount = line_subtotal * (discount_pct / Decimal("100"))
-        line_total = line_subtotal - line_discount
-        line_amounts.append(
-            {
-                "line": line,
-                "subtotal": line_subtotal,
-                "discount": line_discount,
-                "total": line_total,
-            }
-        )
     return templates.TemplateResponse(
         "invoices/detail.html",
         {
