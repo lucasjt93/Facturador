@@ -31,6 +31,18 @@ def test_create_invoice_draft(client, db_session):
     assert inv.due_date == issue  # fallback 0 days
 
 
+def test_client_select_excludes_deleted(client, db_session):
+    c1 = Client(name="Active", tax_id=None)
+    c2 = Client(name="Deleted", tax_id=None, is_deleted=True)
+    db_session.add_all([c1, c2])
+    db_session.commit()
+    resp = client.get("/invoices/new")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "Active" in body
+    assert "Deleted" not in body
+
+
 def test_issue_invoice(client, db_session):
     c = create_client(db_session)
     client.post(

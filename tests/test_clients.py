@@ -64,9 +64,9 @@ def test_delete_client_with_invoices_blocked(client, db_session):
     db_session.commit()
 
     resp = client.post(f"/clients/{c.id}/delete", follow_redirects=False)
-    assert resp.status_code in (400, 200)  # could render error template
+    assert resp.status_code in (302, 303)
     db_session.refresh(c)
-    assert c.is_deleted is False
+    assert c.is_deleted is True
 
 
 def test_clients_list_order_desc(client, db_session):
@@ -94,3 +94,40 @@ def test_restore_deleted_client(client, db_session):
     assert c.is_deleted is False
     active = client.get("/clients")
     assert "RestoreMe" in active.text
+
+
+def test_soft_delete_client_with_invoices_is_allowed(client, db_session):
+    c = Client(name="HasInvoice", tax_id=None)
+    db_session.add(c)
+    db_session.commit()
+    inv = Invoice(
+        status="draft",
+        series=None,
+        number=None,
+        issue_date=date.today(),
+        due_date=date.today(),
+        client_id=c.id,
+        currency="EUR",
+        igi_rate=0,
+        notes="",
+    )
+    db_session.add(inv)
+    db_session.commit()
+
+    resp = client.post(f"/clients/{c.id}/delete", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    db_session.refresh(c)
+    assert c.is_deleted is True
+
+
+def test_deleted_client_not_listed_in_clients_index(client, db_session):
+    c = Client(name="HideMe", tax_id=None)
+    db_session.add(c)
+    db_session.commit()
+    client.post(f"/clients/{c.id}/delete", follow_redirects=False)
+
+    resp_active = client.get("/clients")
+    assert "HideMe" not in resp_active.text
+    resp_deleted = client.get("/clients/deleted")
+    assert resp_deleted.status_code == 200
+    assert "HideMe" in resp_deleted.text

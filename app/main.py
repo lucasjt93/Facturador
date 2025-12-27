@@ -619,7 +619,7 @@ def list_invoices(request: Request, db: Session = Depends(get_db)) -> HTMLRespon
 
 @app.get("/invoices/new", response_class=HTMLResponse)
 def new_invoice(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-    clients = db.query(Client).order_by(Client.name).all()
+    clients = db.query(Client).filter(Client.is_deleted.is_(False)).order_by(Client.name).all()
     today_str = date.today().isoformat()
     return templates.TemplateResponse(
         "invoices/new.html",
@@ -769,16 +769,6 @@ def delete_client(
     client = _get_client(db, client_id)
     if not client:
         return HTMLResponse(content="Cliente no encontrado", status_code=404)
-    has_invoices = db.query(Invoice).filter(Invoice.client_id == client_id).first()
-    if has_invoices:
-        return templates.TemplateResponse(
-            "error.html",
-            {
-                "request": request,
-                "message": "No se puede eliminar el cliente porque tiene facturas asociadas.",
-            },
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
     client.is_deleted = True
     db.commit()
     return RedirectResponse(url="/clients", status_code=status.HTTP_303_SEE_OTHER)
