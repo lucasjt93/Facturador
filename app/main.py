@@ -4,6 +4,7 @@ from typing import Dict, Optional
 
 from fastapi import Depends, FastAPI, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc
 from sqlalchemy.exc import IntegrityError
@@ -15,6 +16,7 @@ from .services import compute_line_amounts, compute_totals
 
 app = FastAPI()
 templates = Jinja2Templates(directory="app/templates")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
 @app.get("/")
