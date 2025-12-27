@@ -39,7 +39,8 @@
             letter-spacing: 0.2px;
         }
         main {
-            max-width: 960px;
+            max-width: 1400px;
+            width: 100%;
             margin: 32px auto;
             padding: 0 18px 32px;
         }
@@ -49,6 +50,7 @@
             border-radius: 12px;
             box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
             padding: 22px;
+            width: 100%;
         }
         .table-wrapper {
             width: 100%;
@@ -95,10 +97,24 @@
         table { width: 100%; min-width: 860px; border-collapse: collapse; }
         th, td { padding: 12px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
         th { color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13px; white-space: nowrap; }
-        td { word-break: break-word; }
+        td { word-break: normal; }
         tr:hover td { background: #f1f5f9; }
         .table-actions { text-align: right; }
         .table-actions .btn { white-space: nowrap; }
+        .table-email {
+            max-width: 240px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .table-email span { display: inline-block; max-width: 100%; }
+        .table-address {
+            max-width: 320px;
+            word-break: normal;
+        }
+        .table-country {
+            white-space: nowrap;
+        }
         form {
             display: grid;
             gap: 14px;
@@ -142,7 +158,6 @@
         <div><a href="/clients">Facturador</a></div>
         <div class="nav-links">
             <a href="/clients">Clientes</a>
-            <a href="/clients/deleted">Eliminados</a>
             <a href="/invoices">Facturas</a>
             <a href="/company">Mi empresa</a>
         </div>
