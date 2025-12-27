@@ -9,7 +9,13 @@
     </div>
     <h2>Factura #{{ invoice.id }} ({{ invoice.status }})</h2>
     <p><strong>Número:</strong> {{ invoice.invoice_number if invoice.invoice_number else "Draft" }}</p>
-    <p><strong>Cliente:</strong> {{ client.name if client else 'N/A' }}</p>
+    <p><strong>Cliente:</strong>
+        {% if invoice.status == 'issued' %}
+            {{ invoice.client_name_snapshot }}
+        {% else %}
+            {{ client.name if client else 'N/A' }}
+        {% endif %}
+    </p>
     <p><strong>Fecha emisión:</strong> {{ invoice.issue_date }} · <strong>Vencimiento:</strong> {{ invoice.due_date }}</p>
     <p><strong>Moneda:</strong> {{ invoice.currency }} · <strong>IGI %:</strong> {{ invoice.igi_rate }}</p>
     {% if invoice.notes %}<p><strong>Notas:</strong> {{ invoice.notes }}</p>{% endif %}
@@ -99,10 +105,16 @@
     </div>
 
     <h3>Totales</h3>
-    <p>Subtotal: {{ "{:.2f}".format(totals.subtotal) }} {{ invoice.currency }}</p>
-    <p>Descuento: {{ "{:.2f}".format(totals.discount) }} {{ invoice.currency }}</p>
-    <p>Base: {{ "{:.2f}".format(totals.base) }} {{ invoice.currency }}</p>
-    <p>IGI: {{ "{:.2f}".format(totals.igi) }} {{ invoice.currency }}</p>
-    <p><strong>Total: {{ "{:.2f}".format(totals.total) }} {{ invoice.currency }}</strong></p>
+    {% if invoice.status == 'issued' and invoice.total_snapshot is not none %}
+        <p>Subtotal: {{ "{:.2f}".format(invoice.subtotal_snapshot) }} {{ invoice.currency }}</p>
+        <p>IGI: {{ "{:.2f}".format(invoice.igi_amount_snapshot) }} {{ invoice.currency }}</p>
+        <p><strong>Total: {{ "{:.2f}".format(invoice.total_snapshot) }} {{ invoice.currency }}</strong></p>
+    {% else %}
+        <p>Subtotal: {{ "{:.2f}".format(totals.subtotal) }} {{ invoice.currency }}</p>
+        <p>Descuento: {{ "{:.2f}".format(totals.discount) }} {{ invoice.currency }}</p>
+        <p>Base: {{ "{:.2f}".format(totals.base) }} {{ invoice.currency }}</p>
+        <p>IGI: {{ "{:.2f}".format(totals.igi) }} {{ invoice.currency }}</p>
+        <p><strong>Total: {{ "{:.2f}".format(totals.total) }} {{ invoice.currency }}</strong></p>
+    {% endif %}
 </div>
 {% endblock %}

@@ -32,14 +32,26 @@
                     <td>{{ invoice.id }}</td>
                     <td>{{ invoice.status }}</td>
                     <td>{{ invoice.invoice_number if invoice.invoice_number else "Draft" }}</td>
-                    <td>{{ invoice.client.name if invoice.client else '' }}</td>
+                    <td>
+                        {% if invoice.status == 'issued' %}
+                            {{ invoice.client_name_snapshot }}
+                        {% else %}
+                            {{ invoice.client.name if invoice.client else '' }}
+                        {% endif %}
+                    </td>
                     <td>{{ invoice.issue_date }}</td>
                     <td>{{ invoice.due_date }}</td>
                     <td>{{ invoice.currency }}</td>
                     <td>{{ invoice.igi_rate }}</td>
-                    <td>{{ "{:.2f}".format(totals.subtotal) if totals else "" }}</td>
-                    <td>{{ "{:.2f}".format(totals.igi) if totals else "" }}</td>
-                    <td>{{ "{:.2f}".format(totals.total) if totals else "" }}</td>
+                    {% if invoice.status == 'issued' and invoice.total_snapshot is not none %}
+                        <td>{{ "{:.2f}".format(invoice.subtotal_snapshot) }}</td>
+                        <td>{{ "{:.2f}".format(invoice.igi_amount_snapshot) }}</td>
+                        <td>{{ "{:.2f}".format(invoice.total_snapshot) }}</td>
+                    {% else %}
+                        <td>{{ "{:.2f}".format(totals.subtotal) if totals else "" }}</td>
+                        <td>{{ "{:.2f}".format(totals.igi) if totals else "" }}</td>
+                        <td>{{ "{:.2f}".format(totals.total) if totals else "" }}</td>
+                    {% endif %}
                     <td class="table-actions"><a class="btn btn-secondary" href="/invoices/{{ invoice.id }}">Ver</a></td>
                 </tr>
             {% else %}

@@ -535,7 +535,7 @@ def issue_invoice(
 ) -> HTMLResponse:
     invoice = (
         db.query(Invoice)
-        .options(selectinload(Invoice.lines))
+        .options(selectinload(Invoice.lines), joinedload(Invoice.client))
         .filter(Invoice.id == invoice_id)
         .first()
     )
@@ -552,8 +552,12 @@ def issue_invoice(
         )
 
     year_full = invoice.issue_date.year if invoice.issue_date else date.today().year
+    terms_applied = _effective_payment_terms_days(
+        invoice.client, _get_company(db)
+    ) or 0
+    totals = compute_totals(invoice, invoice.lines)
 
-    def assign_number():
+    def assign_number_and_snapshot():
         seq = (
             db.query(InvoiceSequence)
             .filter(InvoiceSequence.year_full == year_full)
@@ -570,10 +574,17 @@ def issue_invoice(
         invoice.number = n
         invoice.invoice_number = code
         invoice.status = "issued"
+        invoice.client_name_snapshot = invoice.client.name
+        invoice.client_tax_id_snapshot = invoice.client.tax_id
+        invoice.subtotal_snapshot = totals["subtotal"]
+        invoice.igi_amount_snapshot = totals["igi"]
+        invoice.total_snapshot = totals["total"]
+        invoice.payment_terms_days_applied = terms_applied
+        invoice.igi_rate_snapshot = invoice.igi_rate
 
     for attempt in range(2):
         try:
-            assign_number()
+            assign_number_and_snapshot()
             db.commit()
             break
         except IntegrityError:
