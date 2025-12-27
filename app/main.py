@@ -6,10 +6,11 @@ from fastapi import Depends, FastAPI, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from .database import get_db
-from .models import Client, Company, Invoice, InvoiceLine
+from .models import Client, Company, Invoice, InvoiceLine, InvoiceSequence
 from .services import compute_line_amounts, compute_totals
 
 app = FastAPI()
@@ -541,9 +542,8 @@ def issue_invoice(
     if not invoice:
         return HTMLResponse(content="Factura no encontrada", status_code=404)
     if invoice.status != "draft":
-        return HTMLResponse(
-            content="La factura ya fue emitida o no está en borrador.",
-            status_code=status.HTTP_400_BAD_REQUEST,
+        return RedirectResponse(
+            url=f"/invoices/{invoice.id}", status_code=status.HTTP_303_SEE_OTHER
         )
     if not invoice.lines:
         return HTMLResponse(
@@ -551,8 +551,35 @@ def issue_invoice(
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
-    invoice.status = "issued"
-    db.commit()
+    year_full = invoice.issue_date.year if invoice.issue_date else date.today().year
+
+    def assign_number():
+        seq = (
+            db.query(InvoiceSequence)
+            .filter(InvoiceSequence.year_full == year_full)
+            .with_for_update()
+            .first()
+        )
+        if not seq:
+            seq = InvoiceSequence(year_full=year_full, next_number=1)
+            db.add(seq)
+            db.flush()
+        n = seq.next_number
+        seq.next_number = n + 1
+        code = f"TC{year_full % 100:02d}{n:02d}"
+        invoice.number = n
+        invoice.invoice_number = code
+        invoice.status = "issued"
+
+    for attempt in range(2):
+        try:
+            assign_number()
+            db.commit()
+            break
+        except IntegrityError:
+            db.rollback()
+            if attempt == 1:
+                raise
     return RedirectResponse(
         url=f"/invoices/{invoice.id}", status_code=status.HTTP_303_SEE_OTHER
     )

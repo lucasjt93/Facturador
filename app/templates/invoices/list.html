@@ -13,6 +13,7 @@
                 <tr>
                     <th>ID</th>
                     <th>Estado</th>
+                    <th>Número</th>
                     <th>Cliente</th>
                     <th>Fecha emisión</th>
                     <th>Vencimiento</th>
@@ -30,6 +31,7 @@
                 <tr>
                     <td>{{ invoice.id }}</td>
                     <td>{{ invoice.status }}</td>
+                    <td>{{ invoice.invoice_number if invoice.invoice_number else "Draft" }}</td>
                     <td>{{ invoice.client.name if invoice.client else '' }}</td>
                     <td>{{ invoice.issue_date }}</td>
                     <td>{{ invoice.due_date }}</td>
@@ -42,7 +44,7 @@
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="11">No hay facturas.</td>
+                    <td colspan="12">No hay facturas.</td>
                 </tr>
             {% endfor %}
             </tbody>

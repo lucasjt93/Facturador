@@ -224,3 +224,66 @@ def test_smoke_pages(client, db_session):
     )
     inv = db_session.query(Invoice).order_by(Invoice.id.desc()).first()
     assert client.get(f"/invoices/{inv.id}").status_code == 200
+
+
+def _create_invoice_with_date(client, db_session, issue_date: date):
+    c = create_client(db_session)
+    client.post(
+        "/invoices/new",
+        data={
+            "client_id": str(c.id),
+            "issue_date": issue_date.isoformat(),
+            "currency": "EUR",
+            "igi_rate": "0",
+            "notes": "",
+        },
+        follow_redirects=False,
+    )
+    inv = db_session.query(Invoice).order_by(Invoice.id.desc()).first()
+    client.post(
+        f"/invoices/{inv.id}/lines",
+        data={"description": "l1", "qty": "1", "unit_price": "1", "discount_pct": "0"},
+        follow_redirects=False,
+    )
+    return db_session.query(Invoice).get(inv.id)
+
+
+def test_issue_assigns_number_format_TCYYNN(client, db_session):
+    inv = _create_invoice_with_date(client, db_session, date(2026, 1, 15))
+    resp = client.post(f"/invoices/{inv.id}/issue", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    db_session.refresh(inv)
+    assert inv.invoice_number == "TC2601"
+
+
+def test_sequence_increments_same_year(client, db_session):
+    inv1 = _create_invoice_with_date(client, db_session, date(2026, 2, 1))
+    inv2 = _create_invoice_with_date(client, db_session, date(2026, 3, 1))
+    client.post(f"/invoices/{inv1.id}/issue", follow_redirects=False)
+    client.post(f"/invoices/{inv2.id}/issue", follow_redirects=False)
+    db_session.refresh(inv1)
+    db_session.refresh(inv2)
+    assert inv1.invoice_number == "TC2601"
+    assert inv2.invoice_number == "TC2602"
+
+
+def test_sequence_resets_next_year(client, db_session):
+    inv1 = _create_invoice_with_date(client, db_session, date(2026, 5, 1))
+    inv2 = _create_invoice_with_date(client, db_session, date(2027, 1, 1))
+    client.post(f"/invoices/{inv1.id}/issue", follow_redirects=False)
+    client.post(f"/invoices/{inv2.id}/issue", follow_redirects=False)
+    db_session.refresh(inv1)
+    db_session.refresh(inv2)
+    assert inv1.invoice_number == "TC2601"
+    assert inv2.invoice_number == "TC2701"
+
+
+def test_reissue_idempotent_keeps_number(client, db_session):
+    inv = _create_invoice_with_date(client, db_session, date(2026, 6, 1))
+    client.post(f"/invoices/{inv.id}/issue", follow_redirects=False)
+    db_session.refresh(inv)
+    number_first = inv.invoice_number
+    resp = client.post(f"/invoices/{inv.id}/issue", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    db_session.refresh(inv)
+    assert inv.invoice_number == number_first

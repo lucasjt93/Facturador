@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Date, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Column, Date, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -46,7 +46,8 @@ class Invoice(Base):
     id = Column(Integer, primary_key=True, index=True)
     status = Column(String(20), nullable=False, default="draft")
     series = Column(String(20), nullable=True)
-    number = Column(String(20), nullable=True)
+    number = Column(Integer, nullable=True)
+    invoice_number = Column(String(20), nullable=True, unique=True)
     issue_date = Column(Date, nullable=False)
     due_date = Column(Date, nullable=False)
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
@@ -75,3 +76,12 @@ class InvoiceLine(Base):
     sort_order = Column(Integer, nullable=False, default=1)
 
     invoice = relationship("Invoice", back_populates="lines")
+
+
+class InvoiceSequence(Base):
+    __tablename__ = "invoice_sequences"
+    __table_args__ = (UniqueConstraint("year_full"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    year_full = Column(Integer, nullable=False)
+    next_number = Column(Integer, nullable=False, default=1)

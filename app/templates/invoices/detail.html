@@ -8,6 +8,7 @@
         <a class="btn btn-secondary" href="/invoices">← Volver a facturas</a>
     </div>
     <h2>Factura #{{ invoice.id }} ({{ invoice.status }})</h2>
+    <p><strong>Número:</strong> {{ invoice.invoice_number if invoice.invoice_number else "Draft" }}</p>
     <p><strong>Cliente:</strong> {{ client.name if client else 'N/A' }}</p>
     <p><strong>Fecha emisión:</strong> {{ invoice.issue_date }} · <strong>Vencimiento:</strong> {{ invoice.due_date }}</p>
     <p><strong>Moneda:</strong> {{ invoice.currency }} · <strong>IGI %:</strong> {{ invoice.igi_rate }}</p>
