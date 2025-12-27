@@ -24,7 +24,9 @@ def root() -> RedirectResponse:
 
 @app.get("/clients", response_class=HTMLResponse)
 def list_clients(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-    clients = db.query(Client).order_by(desc(Client.id)).all()
+    clients = (
+        db.query(Client).filter(Client.is_deleted.is_(False)).order_by(desc(Client.id)).all()
+    )
     company = _get_company(db)
     effective_terms = {
         client.id: _effective_payment_terms_days(client, company) for client in clients
@@ -34,9 +36,10 @@ def list_clients(request: Request, db: Session = Depends(get_db)) -> HTMLRespons
         {
             "request": request,
             "clients": clients,
-            "default_payment_terms_days": company.payment_terms_days if company else None,
-            "effective_payment_terms_days": effective_terms,
-        },
+        "default_payment_terms_days": company.payment_terms_days if company else None,
+        "effective_payment_terms_days": effective_terms,
+        "show_deleted": False,
+    },
     )
 
 
@@ -776,7 +779,7 @@ def delete_client(
             },
             status_code=status.HTTP_400_BAD_REQUEST,
         )
-    db.delete(client)
+    client.is_deleted = True
     db.commit()
     return RedirectResponse(url="/clients", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -789,3 +792,36 @@ def delete_invoice(invoice_id: int, db: Session = Depends(get_db)) -> HTMLRespon
     db.delete(invoice)
     db.commit()
     return RedirectResponse(url="/invoices", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/clients/deleted", response_class=HTMLResponse)
+def list_deleted_clients(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    clients = (
+        db.query(Client).filter(Client.is_deleted.is_(True)).order_by(desc(Client.id)).all()
+    )
+    company = _get_company(db)
+    effective_terms = {
+        client.id: _effective_payment_terms_days(client, company) for client in clients
+    }
+    return templates.TemplateResponse(
+        "clients/list.html",
+        {
+            "request": request,
+            "clients": clients,
+            "default_payment_terms_days": company.payment_terms_days if company else None,
+            "effective_payment_terms_days": effective_terms,
+            "show_deleted": True,
+        },
+    )
+
+
+@app.post("/clients/{client_id}/restore")
+def restore_client(
+    client_id: int, db: Session = Depends(get_db)
+) -> HTMLResponse:
+    client = _get_client(db, client_id)
+    if not client:
+        return HTMLResponse(content="Cliente no encontrado", status_code=404)
+    client.is_deleted = False
+    db.commit()
+    return RedirectResponse(url="/clients", status_code=status.HTTP_303_SEE_OTHER)

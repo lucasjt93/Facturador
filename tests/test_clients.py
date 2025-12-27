@@ -35,7 +35,14 @@ def test_delete_client_without_invoices(client, db_session):
 
     resp = client.post(f"/clients/{c.id}/delete", follow_redirects=False)
     assert resp.status_code in (302, 303)
-    assert db_session.query(Client).filter_by(id=c.id).first() is None
+    db_session.refresh(c)
+    assert c.is_deleted is True
+    # No debe aparecer en listado activo
+    resp_list = client.get("/clients")
+    assert "Solo" not in resp_list.text
+    # Debe aparecer en eliminados
+    resp_deleted = client.get("/clients/deleted")
+    assert "Solo" in resp_deleted.text
 
 
 def test_delete_client_with_invoices_blocked(client, db_session):
@@ -58,7 +65,8 @@ def test_delete_client_with_invoices_blocked(client, db_session):
 
     resp = client.post(f"/clients/{c.id}/delete", follow_redirects=False)
     assert resp.status_code in (400, 200)  # could render error template
-    assert db_session.query(Client).filter_by(id=c.id).first() is not None
+    db_session.refresh(c)
+    assert c.is_deleted is False
 
 
 def test_clients_list_order_desc(client, db_session):
@@ -73,3 +81,16 @@ def test_clients_list_order_desc(client, db_session):
     pos_old = body.index("Old")
     pos_new = body.index("New")
     assert pos_new < pos_old  # newer appears first
+
+
+def test_restore_deleted_client(client, db_session):
+    c = Client(name="RestoreMe", tax_id=None, is_deleted=True)
+    db_session.add(c)
+    db_session.commit()
+
+    resp = client.post(f"/clients/{c.id}/restore", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    db_session.refresh(c)
+    assert c.is_deleted is False
+    active = client.get("/clients")
+    assert "RestoreMe" in active.text

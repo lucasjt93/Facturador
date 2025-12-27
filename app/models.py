@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Date, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, Date, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -19,6 +19,7 @@ class Client(Base):
     phone = Column(String(100), nullable=True)
     email = Column(String(255), nullable=True)
     payment_terms_days = Column(Integer, nullable=True)
+    is_deleted = Column(Boolean, nullable=False, default=False, server_default="0")
 
 
 class Company(Base):

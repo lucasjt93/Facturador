@@ -22,10 +22,14 @@
                     <th>Pago (días)</th>
                     <th>Email</th>
                 <th>Editar</th>
-                <th>Eliminar</th>
-            </tr>
-        </thead>
-        <tbody>
+                    {% if not show_deleted %}
+                    <th>Eliminar</th>
+                    {% else %}
+                    <th>Acciones</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
         {% for client in clients %}
             <tr>
                     <td>{{ client.id }}</td>
@@ -48,19 +52,27 @@
                 </td>
                 <td>{{ client.email }}</td>
                 <td class="table-actions"><a class="btn btn-secondary" href="/clients/{{ client.id }}/edit">Editar</a></td>
-                <td class="table-actions">
-                    <form action="/clients/{{ client.id }}/delete" method="post" style="margin:0;" onsubmit="return confirm('¿Eliminar cliente?');">
-                        <button class="btn btn-danger" type="submit">Eliminar</button>
-                    </form>
-                </td>
+                {% if not show_deleted %}
+                    <td class="table-actions">
+                        <form action="/clients/{{ client.id }}/delete" method="post" style="margin:0;" onsubmit="return confirm('¿Eliminar cliente?');">
+                            <button class="btn btn-danger" type="submit">Eliminar</button>
+                        </form>
+                    </td>
+                {% else %}
+                    <td class="table-actions">
+                        <form action="/clients/{{ client.id }}/restore" method="post" style="margin:0;">
+                            <button class="btn btn-secondary" type="submit">Restaurar</button>
+                        </form>
+                    </td>
+                {% endif %}
             </tr>
         {% else %}
             <tr>
                 <td colspan="12">No hay clientes registrados.</td>
             </tr>
         {% endfor %}
-        </tbody>
-    </table>
-</div>
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}
