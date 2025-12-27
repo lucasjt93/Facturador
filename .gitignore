@@ -4,6 +4,8 @@ env/
 *.pyc
 __pycache__/
 .pytest_cache/
+*.tmp
+tmp*.txt
 
 # Editors / IDE
 .vscode/
@@ -15,4 +17,5 @@ Thumbs.db
 
 # Local data
 app.db
-
+*.db
+*.sqlite3
