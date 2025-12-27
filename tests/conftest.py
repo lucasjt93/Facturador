@@ -1,15 +1,21 @@
 import os
+import sys
 import tempfile
 from datetime import date
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from app.database import Base, get_db
-from app.main import app
-from app import models  # noqa: F401  ensure models are imported
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from app.database import Base, get_db  # noqa: E402
+from app.main import app  # noqa: E402
+from app import models  # noqa: F401,E402  ensure models are imported
 
 
 @pytest.fixture(scope="session")

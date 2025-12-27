@@ -6,6 +6,9 @@
 <div class="card">
     <div class="actions">
         <a class="btn btn-secondary" href="/invoices">← Volver a facturas</a>
+        {% if invoice.status in ['issued', 'paid'] %}
+            <a class="btn btn-secondary" href="/invoices/{{ invoice.id }}/pdf">Ver PDF</a>
+        {% endif %}
     </div>
     <h2>Factura #{{ invoice.id }} ({{ invoice.status }})</h2>
     <p><strong>Número:</strong> {{ invoice.invoice_number if invoice.invoice_number else "Draft" }}</p>
@@ -16,8 +19,8 @@
             {{ client.name if client else 'N/A' }}
         {% endif %}
     </p>
-    <p><strong>Fecha emisión:</strong> {{ invoice.issue_date }} · <strong>Vencimiento:</strong> {{ invoice.due_date }}</p>
-    <p><strong>Moneda:</strong> {{ invoice.currency }} · <strong>IGI %:</strong> {{ invoice.igi_rate }}</p>
+    <p><strong>Fecha emisión:</strong> {{ invoice.issue_date }} | <strong>Vencimiento:</strong> {{ invoice.due_date }}</p>
+    <p><strong>Moneda:</strong> {{ invoice.currency }} | <strong>IGI %:</strong> {{ invoice.igi_rate }}</p>
     {% if invoice.notes %}<p><strong>Notas:</strong> {{ invoice.notes }}</p>{% endif %}
     {% if invoice.status == 'draft' %}
         <form action="/invoices/{{ invoice.id }}/issue" method="post" style="margin: 12px 0;">
