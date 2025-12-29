@@ -47,9 +47,9 @@ def list_clients(request: Request, db: Session = Depends(get_db)) -> HTMLRespons
         {
             "request": request,
             "clients": clients,
-        "default_payment_terms_days": company.payment_terms_days if company else None,
-        "effective_payment_terms_days": effective_terms,
-        "show_deleted": False,
+            "default_payment_terms_days": company.payment_terms_days if company else None,
+            "effective_payment_terms_days": effective_terms,
+            "show_deleted": False,
     },
     )
 
@@ -202,12 +202,6 @@ def _effective_payment_terms_days(
 
 def _parse_date(value: str) -> date:
     return datetime.strptime(value, "%Y-%m-%d").date()
-
-
-def render_error(request: Request, message: str, status_code: int = 400) -> HTMLResponse:
-    return templates.TemplateResponse(
-        "error.html", {"request": request, "message": message}, status_code=status_code
-    )
 
 
 @app.get("/clients/{client_id}/edit", response_class=HTMLResponse)
