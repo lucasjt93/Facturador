@@ -1,25 +1,31 @@
-from datetime import date, datetime, timedelta
+﻿from datetime import date, datetime, timedelta
 from decimal import Decimal
-from io import BytesIO
 from typing import Dict, Optional
 
 from fastapi import Depends, FastAPI, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
 from sqlalchemy import desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from .database import get_db
 from .models import Client, Company, Invoice, InvoiceLine, InvoiceSequence
+from .pdf import build_invoice_pdf_payload, render_invoice_pdf
 from .services import compute_line_amounts, compute_totals
 
 app = FastAPI()
 templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+def render_error(request: Request, message: str, status_code: int = 400) -> HTMLResponse:
+    return templates.TemplateResponse(
+        "error.html",
+        {"request": request, "message": message},
+        status_code=status_code,
+        media_type="text/html; charset=utf-8",
+    )
 
 
 @app.get("/")
@@ -198,121 +204,10 @@ def _parse_date(value: str) -> date:
     return datetime.strptime(value, "%Y-%m-%d").date()
 
 
-def _pdf_totals(invoice: Invoice, lines):
-    if invoice.status in ("issued", "paid") and invoice.total_snapshot is not None:
-        subtotal = Decimal(invoice.subtotal_snapshot or 0)
-        igi_amount = Decimal(invoice.igi_amount_snapshot or 0)
-        total = Decimal(invoice.total_snapshot or 0)
-        base = total - igi_amount
-        return {
-            "subtotal": subtotal,
-            "discount": Decimal("0.00"),
-            "base": base,
-            "igi": igi_amount,
-            "total": total,
-        }
-    return compute_totals(invoice, lines)
-
-
-def build_invoice_pdf_payload(invoice: Invoice, lines):
-    sorted_lines = sorted(lines, key=lambda l: (l.sort_order, l.id))
-    totals = _pdf_totals(invoice, sorted_lines)
-    line_amounts = compute_line_amounts(sorted_lines)
-    return {
-        'invoice_number': invoice.invoice_number or str(invoice.id),
-        'status': invoice.status,
-        'client_name': invoice.client_name_snapshot
-        or (invoice.client.name if invoice.client else ''),
-        'client_tax_id': invoice.client_tax_id_snapshot
-        or (invoice.client.tax_id if invoice.client else ''),
-        'issue_date': invoice.issue_date,
-        'due_date': invoice.due_date,
-        'currency': invoice.currency,
-        'igi_rate': invoice.igi_rate_snapshot
-        if invoice.igi_rate_snapshot is not None
-        else invoice.igi_rate,
-        'totals': totals,
-        'lines': [
-            {
-                'index': idx,
-                'description': line.description or '',
-                'qty': Decimal(line.qty or 0),
-                'unit_price': Decimal(line.unit_price or 0),
-                'discount_pct': Decimal(line.discount_pct or 0),
-                'total': line_total,
-            }
-            for idx, (line, _, _, line_total) in enumerate(line_amounts, start=1)
-        ],
-    }
-
-
-def build_invoice_pdf_bytes(payload: Dict) -> bytes:
-    buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-
-    y = height - 40
-    pdf.setFont('Helvetica-Bold', 16)
-    title = f"Factura {payload['invoice_number']}"
-    pdf.drawString(40, y, title)
-
-    pdf.setFont('Helvetica', 10)
-    y -= 18
-    pdf.drawString(40, y, f"Estado: {payload['status']}")
-    y -= 14
-    pdf.drawString(40, y, f"Cliente: {payload['client_name']}")
-    y -= 14
-    pdf.drawString(40, y, f"Tax ID: {payload['client_tax_id']}")
-    y -= 14
-    pdf.drawString(40, y, f"Emisi?n: {payload['issue_date']}   Vencimiento: {payload['due_date']}")
-    y -= 14
-    pdf.drawString(
-        40,
-        y,
-        f"Moneda: {payload['currency']}   IGI %: {payload['igi_rate']}",
+def render_error(request: Request, message: str, status_code: int = 400) -> HTMLResponse:
+    return templates.TemplateResponse(
+        "error.html", {"request": request, "message": message}, status_code=status_code
     )
-
-    y -= 22
-    pdf.setFont('Helvetica-Bold', 11)
-    pdf.drawString(40, y, 'L?neas')
-    y -= 16
-    pdf.setFont('Helvetica', 9)
-    headers = ['#', 'Descripci?n', 'Cantidad', 'Precio', 'Desc %', 'Importe']
-    col_x = [40, 70, 320, 400, 470, 520]
-    for hx, text in zip(col_x, headers):
-        pdf.drawString(hx, y, text)
-    y -= 12
-
-    for item in payload['lines']:
-        if y < 60:
-            pdf.showPage()
-            y = height - 60
-            pdf.setFont('Helvetica', 9)
-        pdf.drawString(col_x[0], y, str(item['index']))
-        pdf.drawString(col_x[1], y, item['description'][:60])
-        pdf.drawRightString(col_x[2] + 40, y, f"{item['qty']:.2f}")
-        pdf.drawRightString(col_x[3] + 40, y, f"{item['unit_price']:.2f}")
-        pdf.drawRightString(col_x[4] + 30, y, f"{item['discount_pct']:.2f}")
-        pdf.drawRightString(col_x[5] + 40, y, f"{item['total']:.2f}")
-        y -= 12
-
-    totals = payload['totals']
-    y -= 18
-    pdf.setFont('Helvetica-Bold', 11)
-    pdf.drawString(40, y, 'Totales')
-    pdf.setFont('Helvetica', 10)
-    y -= 14
-    pdf.drawString(40, y, f"Subtotal: {totals['subtotal']:.2f} {payload['currency']}")
-    y -= 14
-    pdf.drawString(40, y, f"IGI: {totals['igi']:.2f} {payload['currency']}")
-    y -= 14
-    pdf.drawString(40, y, f"Total: {totals['total']:.2f} {payload['currency']}")
-
-    pdf.showPage()
-    pdf.save()
-    buffer.seek(0)
-    return buffer.getvalue()
-
 
 
 @app.get("/clients/{client_id}/edit", response_class=HTMLResponse)
@@ -656,7 +551,7 @@ def delete_line(
 
 @app.post("/invoices/{invoice_id}/issue")
 def issue_invoice(
-    invoice_id: int, db: Session = Depends(get_db)
+    invoice_id: int, request: Request, db: Session = Depends(get_db)
 ) -> HTMLResponse:
     invoice = (
         db.query(Invoice)
@@ -665,14 +560,15 @@ def issue_invoice(
         .first()
     )
     if not invoice:
-        return HTMLResponse(content="Factura no encontrada", status_code=404)
+        return render_error(request, "Factura no encontrada", status_code=404)
     if invoice.status != "draft":
         return RedirectResponse(
             url=f"/invoices/{invoice.id}", status_code=status.HTTP_303_SEE_OTHER
         )
     if not invoice.lines:
-        return HTMLResponse(
-            content="No se puede emitir una factura sin líneas.",
+        return render_error(
+            request,
+            "No se puede emitir una factura sin líneas.",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -885,7 +781,7 @@ def invoice_detail(
 
 
 @app.get("/invoices/{invoice_id}/pdf")
-def invoice_pdf(invoice_id: int, db: Session = Depends(get_db)) -> Response:
+def invoice_pdf(invoice_id: int, request: Request, db: Session = Depends(get_db)) -> Response:
     invoice = (
         db.query(Invoice)
         .options(joinedload(Invoice.client), selectinload(Invoice.lines))
@@ -893,16 +789,17 @@ def invoice_pdf(invoice_id: int, db: Session = Depends(get_db)) -> Response:
         .first()
     )
     if not invoice:
-        return HTMLResponse(content="Factura no encontrada", status_code=404)
+        return render_error(request, "Factura no encontrada", status_code=404)
     if invoice.status not in ("issued", "paid"):
-        return HTMLResponse(
-            content="Solo se puede generar PDF para facturas emitidas.",
+        return render_error(
+            request,
+            "Solo se puede generar PDF para facturas emitidas.",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
     lines = sorted(invoice.lines, key=lambda l: (l.sort_order, l.id))
     payload = build_invoice_pdf_payload(invoice, lines)
-    pdf_bytes = build_invoice_pdf_bytes(payload)
+    pdf_bytes = render_invoice_pdf(payload)
     filename = f"invoice_{invoice.invoice_number or invoice.id}.pdf"
     return Response(
         content=pdf_bytes,
@@ -964,3 +861,5 @@ def restore_client(
     client.is_deleted = False
     db.commit()
     return RedirectResponse(url="/clients", status_code=status.HTTP_303_SEE_OTHER)
+
+
