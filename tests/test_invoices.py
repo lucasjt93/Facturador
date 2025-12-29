@@ -257,7 +257,7 @@ def _create_invoice_with_date(client, db_session, issue_date: date):
         data={"description": "l1", "qty": "1", "unit_price": "1", "discount_pct": "0"},
         follow_redirects=False,
     )
-    return db_session.query(Invoice).get(inv.id)
+    return db_session.get(Invoice, inv.id)
 
 
 def test_issue_assigns_number_format_TCYYNN(client, db_session):
