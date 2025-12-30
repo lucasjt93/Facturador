@@ -1,5 +1,7 @@
 from datetime import date
 
+import pytest
+
 from app.pdf import build_invoice_pdf_payload
 from app.models import Client, Invoice, InvoiceLine
 
@@ -70,3 +72,23 @@ def test_pdf_uses_snapshot_client_name(client, db_session):
     payload = build_invoice_pdf_payload(inv, inv.lines)
     assert payload["client_name"] == original_name
     assert payload["client_name"] != "Changed Client"
+
+
+def test_pdf_payload_issued_requires_client_name_snapshot(client, db_session):
+    inv = _create_issued_invoice(client, db_session, date(2026, 3, 1))
+    inv.client_name_snapshot = None
+    db_session.commit()
+    db_session.refresh(inv)
+
+    with pytest.raises(ValueError):
+        build_invoice_pdf_payload(inv, inv.lines)
+
+
+def test_pdf_payload_issued_requires_client_tax_id_snapshot(client, db_session):
+    inv = _create_issued_invoice(client, db_session, date(2026, 4, 1))
+    inv.client_tax_id_snapshot = None
+    db_session.commit()
+    db_session.refresh(inv)
+
+    with pytest.raises(ValueError):
+        build_invoice_pdf_payload(inv, inv.lines)

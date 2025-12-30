@@ -27,21 +27,49 @@ def _pdf_totals(invoice: Invoice, lines: Iterable[InvoiceLine]) -> Dict[str, Dec
 
 def build_invoice_pdf_payload(invoice: Invoice, lines: List[InvoiceLine]) -> Dict:
     sorted_lines = sorted(lines, key=lambda l: (l.sort_order, l.id))
-    totals = _pdf_totals(invoice, sorted_lines)
+    is_final = invoice.status in ("issued", "paid")
+
+    if is_final:
+        required = {
+            "client_name_snapshot": invoice.client_name_snapshot,
+            "client_tax_id_snapshot": invoice.client_tax_id_snapshot,
+            "subtotal_snapshot": invoice.subtotal_snapshot,
+            "igi_amount_snapshot": invoice.igi_amount_snapshot,
+            "total_snapshot": invoice.total_snapshot,
+            "igi_rate_snapshot": invoice.igi_rate_snapshot,
+        }
+        for field, value in required.items():
+            if value is None:
+                raise ValueError(f"Missing snapshot: {field} for invoice {invoice.id}")
+        totals = {
+            "subtotal": Decimal(str(invoice.subtotal_snapshot)),
+            "discount": Decimal("0.00"),
+            "base": Decimal(str(invoice.total_snapshot)) - Decimal(str(invoice.igi_amount_snapshot)),
+            "igi": Decimal(str(invoice.igi_amount_snapshot)),
+            "total": Decimal(str(invoice.total_snapshot)),
+        }
+    else:
+        totals = _pdf_totals(invoice, sorted_lines)
+
     line_amounts = compute_line_amounts(sorted_lines)
+    if is_final:
+        client_name = invoice.client_name_snapshot
+        client_tax_id = invoice.client_tax_id_snapshot
+        igi_rate = invoice.igi_rate_snapshot
+    else:
+        client_name = invoice.client_name_snapshot or (invoice.client.name if invoice.client else "")
+        client_tax_id = invoice.client_tax_id_snapshot or (invoice.client.tax_id if invoice.client else "")
+        igi_rate = invoice.igi_rate_snapshot if invoice.igi_rate_snapshot is not None else invoice.igi_rate
+
     return {
         "invoice_number": invoice.invoice_number or str(invoice.id),
         "status": invoice.status,
-        "client_name": invoice.client_name_snapshot
-        or (invoice.client.name if invoice.client else ""),
-        "client_tax_id": invoice.client_tax_id_snapshot
-        or (invoice.client.tax_id if invoice.client else ""),
+        "client_name": client_name,
+        "client_tax_id": client_tax_id,
         "issue_date": invoice.issue_date,
         "due_date": invoice.due_date,
         "currency": invoice.currency,
-        "igi_rate": invoice.igi_rate_snapshot
-        if invoice.igi_rate_snapshot is not None
-        else invoice.igi_rate,
+        "igi_rate": igi_rate,
         "totals": totals,
         "lines": [
             {
