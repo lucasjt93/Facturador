@@ -793,7 +793,8 @@ def invoice_pdf(invoice_id: int, request: Request, db: Session = Depends(get_db)
 
     lines = sorted(invoice.lines, key=lambda l: (l.sort_order, l.id))
     payload = build_invoice_pdf_payload(invoice, lines)
-    pdf_bytes = render_invoice_pdf(payload)
+    company = _get_company(db)
+    pdf_bytes = render_invoice_pdf(payload, company=company, client=invoice.client)
     filename = f"invoice_{invoice.invoice_number or invoice.id}.pdf"
     return Response(
         content=pdf_bytes,
