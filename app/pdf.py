@@ -119,14 +119,21 @@ def render_invoice_pdf(
 
     def draw_header(y_pos: float) -> float:
         y = y_pos
-        pdf.setFont("Helvetica-Bold", 16)
-        pdf.drawString(40, y, f"Factura {payload['invoice_number']}")
-        pdf.setFont("Helvetica", 10)
+        pdf.setFont("Helvetica-Bold", 20)
+        pdf.drawString(40, y, "FACTURA")
+        pdf.setFont("Helvetica-Bold", 26)
+        pdf.drawString(150, y - 2, str(payload["invoice_number"]))
+        pdf.setFont("Helvetica", 9)
         pdf.drawRightString(width - 40, y, f"Estado: {payload['status']}")
-        y -= 14
+        return y - 18
+
+    def draw_company_and_dates(y_pos: float) -> float:
+        y = y_pos
         if company:
+            pdf.setFont("Helvetica-Bold", 11)
             pdf.drawString(40, y, company.name or "")
             y -= 12
+            pdf.setFont("Helvetica", 10)
             if company.tax_id:
                 pdf.drawString(40, y, f"NIF: {company.tax_id}")
                 y -= 12
@@ -138,12 +145,21 @@ def render_invoice_pdf(
                 company.country,
             ]
             addr = " ".join([p for p in addr_parts if p])
-            if addr:
-                pdf.drawString(40, y, addr)
-                y -= 12
-        pdf.drawRightString(width - 40, y, f"Emisión: {payload['issue_date']}")
-        y -= 12
-        pdf.drawRightString(width - 40, y, f"Vencimiento: {payload['due_date']}")
+            for line in wrap_text(addr, max_width=240, font_size=9):
+                pdf.drawString(40, y, line)
+                y -= 11
+            if company.email:
+                pdf.drawString(40, y, company.email)
+                y -= 11
+            if company.phone:
+                pdf.drawString(40, y, f"Tel: {company.phone}")
+                y -= 11
+        pdf.setFont("Helvetica", 10)
+        pdf.drawRightString(width - 40, y_pos, f"Emisión: {payload['issue_date']}")
+        pdf.drawRightString(width - 40, y_pos - 12, f"Vencimiento: {payload['due_date']}")
+        pdf.drawRightString(
+            width - 40, y_pos - 24, f"Moneda: {payload['currency']} | IGI %: {payload['igi_rate']}"
+        )
         return y - 12
 
     def draw_client_block(y_pos: float) -> float:
@@ -165,35 +181,24 @@ def render_invoice_pdf(
                 client.country,
             ]
             addr = " ".join([p for p in addr_parts if p])
-            if addr:
-                pdf.drawString(40, y, addr)
-                y -= 12
+            for line in wrap_text(addr, max_width=400, font_size=9):
+                pdf.drawString(40, y, line)
+                y -= 11
         return y - 8
 
     def draw_table_header(y_pos: float) -> float:
         pdf.setFont("Helvetica-Bold", 11)
-        pdf.drawString(40, y_pos, "Concepto")
-        pdf.drawRightString(430, y_pos, "Cantidad")
-        pdf.drawRightString(width - 40, y_pos, "Importe")
-        return y_pos - 12
-
-    def draw_totals(y_pos: float) -> float:
-        totals = payload["totals"]
-        pdf.setFont("Helvetica-Bold", 11)
-        pdf.drawRightString(width - 40, y_pos, "Totales")
-        pdf.setFont("Helvetica", 10)
-        y = y_pos - 12
-        pdf.drawRightString(width - 40, y, f"Subtotal: {totals['subtotal']:.2f} €")
-        y -= 12
-        pdf.drawRightString(width - 40, y, f"IGI: {totals['igi']:.2f} €")
-        y -= 12
-        pdf.drawRightString(width - 40, y, f"Total: {totals['total']:.2f} €")
-        return y
+        pdf.drawString(40, y_pos, "CONCEPTO")
+        pdf.drawRightString(430, y_pos, "CANTIDAD")
+        pdf.drawRightString(width - 40, y_pos, "IMPORTE")
+        pdf.line(40, y_pos - 2, width - 40, y_pos - 2)
+        return y_pos - 14
 
     y = height - 40
     y = draw_header(y)
+    y = draw_company_and_dates(y)
     y = draw_client_block(y)
-    y = draw_table_header(y - 8)
+    y = draw_table_header(y - 6)
     pdf.setFont("Helvetica", 9)
 
     for item in payload["lines"]:
@@ -204,8 +209,9 @@ def render_invoice_pdf(
             pdf.showPage()
             y = height - 40
             y = draw_header(y)
+            y = draw_company_and_dates(y)
             y = draw_client_block(y)
-            y = draw_table_header(y - 8)
+            y = draw_table_header(y - 6)
             pdf.setFont("Helvetica", 9)
 
         start_y = y
@@ -215,11 +221,22 @@ def render_invoice_pdf(
         pdf.drawRightString(width - 40, start_y, f"{item['total']:.2f} €")
         y = start_y - needed_height
 
-    y -= 10
-    y = draw_totals(y)
+    # Totales box a la derecha
+    box_width = 180
+    box_height = 50
+    box_x = width - box_width - 40
+    box_y = y - 10
+    pdf.rect(box_x, box_y - box_height, box_width, box_height, stroke=1, fill=0)
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(box_x + 8, box_y - 12, "Totales")
+    pdf.setFont("Helvetica", 10)
+    pdf.drawRightString(box_x + box_width - 8, box_y - 22, f"Subtotal: {payload['totals']['subtotal']:.2f} €")
+    pdf.drawRightString(box_x + box_width - 8, box_y - 34, f"IGI: {payload['totals']['igi']:.2f} €")
+    pdf.setFont("Helvetica-Bold", 12)
+    pdf.drawRightString(box_x + box_width - 8, box_y - 46, f"TOTAL: {payload['totals']['total']:.2f} €")
 
     if payload.get("show_igi_exempt_footer"):
-        pdf.setFont("Helvetica", 9)
+        pdf.setFont("Helvetica", 8)
         footer_text = (
             "Operació exempta de l’Impost General Indirecte, d’acord amb l’article 43 de la Llei 11/2012"
         )
