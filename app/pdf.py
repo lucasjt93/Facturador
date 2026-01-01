@@ -119,15 +119,48 @@ def render_invoice_pdf(
 
     def draw_header(y_pos: float) -> float:
         y = y_pos
-        pdf.setFont("Helvetica-Bold", 20)
-        pdf.drawString(40, y, "FACTURA")
-        pdf.setFont("Helvetica-Bold", 26)
-        pdf.drawString(150, y - 2, str(payload["invoice_number"]))
-        pdf.setFont("Helvetica", 9)
-        pdf.drawRightString(width - 40, y, f"Estado: {payload['status']}")
-        return y - 18
+        if company:
+            pdf.setFont("Helvetica-Bold", 11)
+            pdf.drawString(40, y, company.name or "")
+            y -= 12
+            pdf.setFont("Helvetica", 9)
+            if company.tax_id:
+                pdf.drawString(40, y, f"NIF: {company.tax_id}")
+                y -= 11
+            addr_parts = [
+                company.address_line1,
+                company.address_line2,
+                company.postal_code,
+                company.city,
+                company.country,
+            ]
+            addr = " ".join([p for p in addr_parts if p])
+            for line in wrap_text(addr, max_width=230, font_size=8):
+                pdf.drawString(40, y, line)
+                y -= 10
+            if company.email:
+                pdf.drawString(40, y, company.email)
+                y -= 10
+            if company.phone:
+                pdf.drawString(40, y, f"Tel: {company.phone}")
+                y -= 10
+        pdf.setFont("Helvetica-Bold", 22)
+        pdf.drawRightString(width - 40, y_pos, "FACTURA")
+        pdf.setFont("Helvetica-Bold", 28)
+        pdf.drawRightString(width - 40, y_pos - 24, str(payload["invoice_number"]))
+        return y - 6
 
     def draw_company_and_dates(y_pos: float) -> float:
+        box_w = 200
+        box_h = 52
+        box_x = width - 40 - box_w
+        box_y = y_pos - box_h
+        pdf.rect(box_x, box_y, box_w, box_h, stroke=1, fill=0)
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(box_x + 8, box_y + box_h - 12, f"Emisión: {payload['issue_date']}")
+        pdf.drawString(box_x + 8, box_y + box_h - 24, f"Vencimiento: {payload['due_date']}")
+        pdf.drawString(box_x + 8, box_y + box_h - 36, f"Moneda: {payload['currency']} | IGI: {payload['igi_rate']}%")
+        return box_y - 12
         y = y_pos
         if company:
             pdf.setFont("Helvetica-Bold", 11)
