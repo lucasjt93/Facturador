@@ -52,6 +52,7 @@ def build_invoice_pdf_payload(invoice: Invoice, lines: List[InvoiceLine]) -> Dic
         totals = _pdf_totals(invoice, sorted_lines)
 
     line_amounts = compute_line_amounts(sorted_lines)
+
     if is_final:
         client_name = invoice.client_name_snapshot
         client_tax_id = invoice.client_tax_id_snapshot
@@ -64,6 +65,7 @@ def build_invoice_pdf_payload(invoice: Invoice, lines: List[InvoiceLine]) -> Dic
             if invoice.igi_rate_snapshot is not None
             else Decimal(str(invoice.igi_rate))
         )
+
     show_igi_exempt_footer = igi_rate == Decimal("0")
 
     return {
@@ -100,6 +102,11 @@ def render_invoice_pdf(
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
+    margin_x = 40
+    gap = 12
+    invoice_box_w = 220
+    invoice_box_h = 66
+
     def wrap_text(text: str, max_width: float, font_name: str = "Helvetica", font_size: int = 9) -> List[str]:
         pdf.setFont(font_name, font_size)
         words = text.split()
@@ -117,16 +124,35 @@ def render_invoice_pdf(
             lines.append(current)
         return lines or [""]
 
-    def draw_header(y_pos: float) -> float:
-        y = y_pos
+    def client_box_height(box_w: float) -> float:
+        pad_top = 14
+        line_h = 11
+        min_h = 70
 
-        left_x = 40
+        lines_count = 3  # Cliente, nombre, Tax ID
 
-        # Caja fija (igual filosofía que el bloque de factura)
+        if client:
+            addr_parts = [
+                client.address_line1 or client.address,
+                client.address_line2,
+                client.postal_code,
+                client.city,
+                client.country,
+            ]
+            addr = " ".join([p for p in addr_parts if p])
+            # pad_x = 8
+            addr_lines = wrap_text(addr, max_width=box_w - 2 * 8, font_size=9)
+            lines_count += len(addr_lines)
+
+        return max(min_h, pad_top + (lines_count * line_h) + 10)
+
+    def draw_header(y_pos: float, box_h: int = invoice_box_h) -> float:
+        left_x = margin_x
+
+        # Caja company: ancho fijo (como venías), altura variable para alinear con fila 2
         box_w = 320
-        box_h = 66
         box_x = left_x
-        box_y = y_pos - box_h  # top alineado con y_pos
+        box_y = y_pos - box_h
 
         pad_x = 8
         pad_top = 14
@@ -170,20 +196,20 @@ def render_invoice_pdf(
 
         return y_pos - box_h - 12
 
-
     def draw_company_and_dates(y_pos: float) -> float:
-        box_w = 220
-        box_h = 66
-        box_x = width - 40 - box_w
+        box_w = invoice_box_w
+        box_h = invoice_box_h
+        box_x = width - margin_x - box_w
         box_y = y_pos - box_h
 
+        pdf.setLineWidth(1)
+        pdf.setStrokeColorRGB(0, 0, 0)
         pdf.rect(box_x, box_y, box_w, box_h, stroke=1, fill=0)
 
         pad_x = 8
         line_h = 12
         y_text = box_y + box_h - 14
 
-        # Número de factura dentro del bloque derecho (más pequeño que antes)
         pdf.setFont("Helvetica-Bold", 12)
         pdf.drawString(box_x + pad_x, y_text, f"Factura Nº: {payload['invoice_number']}")
         y_text -= line_h
@@ -197,23 +223,20 @@ def render_invoice_pdf(
 
         return box_y - 12
 
-
     def draw_client_block(y_pos: float) -> float:
-        # Debajo del bloque factura (mismo ancho y misma X)
-        margin_x = 40
-        box_w = 220
-        box_x = width - margin_x - box_w
+        # Cliente a la izquierda, en la misma fila que la factura a la derecha
+        box_x = margin_x
+        box_w = width - 2 * margin_x - invoice_box_w - gap
 
-        # Altura: ajusta según contenido (con un mínimo)
         pad_x = 8
         pad_top = 14
         line_h = 11
 
-        # Construimos líneas a dibujar (cliente + tax id + dirección wrap)
-        lines: List[str] = []
-        lines.append("Cliente")
-        lines.append(payload["client_name"])
-        lines.append(f"Tax ID: {payload['client_tax_id']}")
+        lines: List[str] = [
+            "Cliente",
+            payload["client_name"],
+            f"Tax ID: {payload['client_tax_id']}",
+        ]
 
         if client:
             addr_parts = [
@@ -227,26 +250,21 @@ def render_invoice_pdf(
             addr_lines = wrap_text(addr, max_width=box_w - 2 * pad_x, font_size=9)
             lines.extend(addr_lines)
 
-        # Calcula alto del bloque
         min_h = 70
         box_h = max(min_h, pad_top + (len(lines) * line_h) + 10)
         box_y = y_pos - box_h
 
-        # Rectángulo
         pdf.setLineWidth(1)
         pdf.setStrokeColorRGB(0, 0, 0)
         pdf.rect(box_x, box_y, box_w, box_h, stroke=1, fill=0)
 
-        # Texto
         tx = box_x + pad_x
         ty = box_y + box_h - pad_top
 
-        # Título en bold
         pdf.setFont("Helvetica-Bold", 11)
         pdf.drawString(tx, ty, lines[0])
         ty -= 14
 
-        # Resto
         pdf.setFont("Helvetica", 9)
         for line in lines[1:]:
             pdf.drawString(tx, ty, line)
@@ -254,26 +272,29 @@ def render_invoice_pdf(
 
         return box_y - 12
 
-
     def draw_table_header(y_pos: float) -> float:
         pdf.setFont("Helvetica-Bold", 11)
-        pdf.drawString(40, y_pos, "CONCEPTO")
+        pdf.drawString(margin_x, y_pos, "CONCEPTO")
         pdf.drawRightString(430, y_pos, "CANTIDAD")
-        pdf.drawRightString(width - 40, y_pos, "IMPORTE")
-        pdf.line(40, y_pos - 2, width - 40, y_pos - 2)
+        pdf.drawRightString(width - margin_x, y_pos, "IMPORTE")
+        pdf.line(margin_x, y_pos - 2, width - margin_x, y_pos - 2)
         return y_pos - 14
 
     y = height - 40
-    header_top = y
 
-    y_after_company = draw_header(header_top)
-    y_after_invoice_box = draw_company_and_dates(header_top)
+    # Fila 2: Cliente (izq) + Factura (der)
+    client_w = width - 2 * margin_x - invoice_box_w - gap
+    row2_client_h = client_box_height(client_w)
+    row2_h = max(row2_client_h, invoice_box_h)
 
-    # El cliente debe colgar del bloque de factura:
-    y_after_client = draw_client_block(y_after_invoice_box)
+    # Fila 1: Company arriba; Fila 2 debajo
+    y_after_company = draw_header(y, box_h=int(row2_h))
 
-    # Para seguir con la tabla, usa el más bajo de los dos (empresa vs cliente)
-    y = min(y_after_company, y_after_client)
+    row2_top = y_after_company - 12
+    y_after_client = draw_client_block(row2_top)
+    y_after_invoice_box = draw_company_and_dates(row2_top)
+
+    y = min(y_after_client, y_after_invoice_box)
     y = draw_table_header(y - 6)
 
     pdf.setFont("Helvetica", 9)
@@ -282,37 +303,50 @@ def render_invoice_pdf(
         concept_lines = wrap_text(item["description"], max_width=360, font_size=9)
         line_height = 12
         needed_height = max(line_height * len(concept_lines), line_height) + 4
+
         if y - needed_height < 80:
             pdf.showPage()
             y = height - 40
-            header_top = y
 
-            y_after_company = draw_header(header_top)
-            y_after_invoice_box = draw_company_and_dates(header_top)
-            y_after_client = draw_client_block(y_after_invoice_box)
+            client_w = width - 2 * margin_x - invoice_box_w - gap
+            row2_client_h = client_box_height(client_w)
+            row2_h = max(row2_client_h, invoice_box_h)
 
-            y = min(y_after_company, y_after_client)
+            y_after_company = draw_header(y, box_h=int(row2_h))
+
+            row2_top = y_after_company - 12
+            y_after_client = draw_client_block(row2_top)
+            y_after_invoice_box = draw_company_and_dates(row2_top)
+
+            y = min(y_after_client, y_after_invoice_box)
             y = draw_table_header(y - 6)
             pdf.setFont("Helvetica", 9)
 
         start_y = y
         for idx, text in enumerate(concept_lines):
-            pdf.drawString(40, start_y - (idx * line_height), text)
+            pdf.drawString(margin_x, start_y - (idx * line_height), text)
+
         pdf.drawRightString(430, start_y, f"{item['qty']:.2f}")
-        pdf.drawRightString(width - 40, start_y, f"{item['total']:.2f} €")
+        pdf.drawRightString(width - margin_x, start_y, f"{item['total']:.2f} €")
         y = start_y - needed_height
 
     # Totales box a la derecha
     box_width = 180
     box_height = 50
-    box_x = width - box_width - 40
+    box_x = width - box_width - margin_x
     box_y = y - 10
+
+    pdf.setLineWidth(1)
+    pdf.setStrokeColorRGB(0, 0, 0)
     pdf.rect(box_x, box_y - box_height, box_width, box_height, stroke=1, fill=0)
+
     pdf.setFont("Helvetica-Bold", 11)
     pdf.drawString(box_x + 8, box_y - 12, "Totales")
+
     pdf.setFont("Helvetica", 10)
-    pdf.drawRightString(box_x + box_width - 8, box_y - 22, f"Subtotal: {payload['totals']['subtotal']:.2f} €")
+    pdf.drawRightString(box_x + box_width - 8, box_y - 22, f"Base: {payload['totals']['subtotal']:.2f} €")
     pdf.drawRightString(box_x + box_width - 8, box_y - 34, f"IGI: {payload['totals']['igi']:.2f} €")
+
     pdf.setFont("Helvetica-Bold", 12)
     pdf.drawRightString(box_x + box_width - 8, box_y - 46, f"TOTAL: {payload['totals']['total']:.2f} €")
 
@@ -321,7 +355,7 @@ def render_invoice_pdf(
         footer_text = (
             "Operació exempta de l’Impost General Indirecte, d’acord amb l’article 43 de la Llei 11/2012"
         )
-        pdf.drawString(40, 40, footer_text)
+        pdf.drawString(margin_x, 40, footer_text)
 
     pdf.save()
     buffer.seek(0)
