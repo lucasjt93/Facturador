@@ -144,56 +144,35 @@ def render_invoice_pdf(
             if company.phone:
                 pdf.drawString(40, y, f"Tel: {company.phone}")
                 y -= 10
-        pdf.setFont("Helvetica-Bold", 22)
-        pdf.drawRightString(width - 40, y_pos, "FACTURA")
-        pdf.setFont("Helvetica-Bold", 28)
-        pdf.drawRightString(width - 40, y_pos - 24, str(payload["invoice_number"]))
+                
         return y - 6
 
     def draw_company_and_dates(y_pos: float) -> float:
-        box_w = 200
-        box_h = 52
+        box_w = 220
+        box_h = 66
         box_x = width - 40 - box_w
         box_y = y_pos - box_h
+
         pdf.rect(box_x, box_y, box_w, box_h, stroke=1, fill=0)
+
+        pad_x = 8
+        line_h = 12
+        y_text = box_y + box_h - 14
+
+        # Número de factura dentro del bloque derecho (más pequeño que antes)
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(box_x + pad_x, y_text, f"Factura Nº: {payload['invoice_number']}")
+        y_text -= line_h
+
         pdf.setFont("Helvetica", 9)
-        pdf.drawString(box_x + 8, box_y + box_h - 12, f"Emisión: {payload['issue_date']}")
-        pdf.drawString(box_x + 8, box_y + box_h - 24, f"Vencimiento: {payload['due_date']}")
-        pdf.drawString(box_x + 8, box_y + box_h - 36, f"Moneda: {payload['currency']} | IGI: {payload['igi_rate']}%")
+        pdf.drawString(box_x + pad_x, y_text, f"Emisión: {payload['issue_date']}")
+        y_text -= line_h
+        pdf.drawString(box_x + pad_x, y_text, f"Vencimiento: {payload['due_date']}")
+        y_text -= line_h
+        pdf.drawString(box_x + pad_x, y_text, f"Moneda: {payload['currency']} | IGI: {payload['igi_rate']}%")
+
         return box_y - 12
-        y = y_pos
-        if company:
-            pdf.setFont("Helvetica-Bold", 11)
-            pdf.drawString(40, y, company.name or "")
-            y -= 12
-            pdf.setFont("Helvetica", 10)
-            if company.tax_id:
-                pdf.drawString(40, y, f"NIF: {company.tax_id}")
-                y -= 12
-            addr_parts = [
-                company.address_line1,
-                company.address_line2,
-                company.postal_code,
-                company.city,
-                company.country,
-            ]
-            addr = " ".join([p for p in addr_parts if p])
-            for line in wrap_text(addr, max_width=240, font_size=9):
-                pdf.drawString(40, y, line)
-                y -= 11
-            if company.email:
-                pdf.drawString(40, y, company.email)
-                y -= 11
-            if company.phone:
-                pdf.drawString(40, y, f"Tel: {company.phone}")
-                y -= 11
-        pdf.setFont("Helvetica", 10)
-        pdf.drawRightString(width - 40, y_pos, f"Emisión: {payload['issue_date']}")
-        pdf.drawRightString(width - 40, y_pos - 12, f"Vencimiento: {payload['due_date']}")
-        pdf.drawRightString(
-            width - 40, y_pos - 24, f"Moneda: {payload['currency']} | IGI %: {payload['igi_rate']}"
-        )
-        return y - 12
+
 
     def draw_client_block(y_pos: float) -> float:
         y = y_pos
