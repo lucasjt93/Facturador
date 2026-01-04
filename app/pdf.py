@@ -194,7 +194,7 @@ def render_invoice_pdf(
                 pdf.drawString(tx, ty, f"Tel: {company.phone}")
                 ty -= line_h
 
-        return y_pos - box_h - 12
+        return y_pos - box_h
 
     def draw_company_and_dates(y_pos: float) -> float:
         box_w = invoice_box_w
@@ -290,7 +290,7 @@ def render_invoice_pdf(
     # Fila 1: Company arriba; Fila 2 debajo
     y_after_company = draw_header(y, box_h=int(row2_h))
 
-    row2_top = y_after_company - 12
+    row2_top = y_after_company - 18
     y_after_client = draw_client_block(row2_top)
     y_after_invoice_box = draw_company_and_dates(row2_top)
 
@@ -348,7 +348,7 @@ def render_invoice_pdf(
     pdf.drawRightString(box_x + box_width - 8, box_y - 34, f"IGI: {payload['totals']['igi']:.2f} €")
 
     pdf.setFont("Helvetica-Bold", 12)
-    pdf.drawRightString(box_x + box_width - 8, box_y - 46, f"TOTAL: {payload['totals']['total']:.2f} €")
+    pdf.drawRightString(box_x + box_width - 8, box_y - 48, f"TOTAL: {payload['totals']['total']:.2f} €")
 
     if payload.get("show_igi_exempt_footer"):
         pdf.setFont("Helvetica", 8)
