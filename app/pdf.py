@@ -156,14 +156,11 @@ def render_invoice_pdf(
             return invoice_box_h
 
         lines_count = 0
-        # Nombre
-        lines_count += 1
+        lines_count += 1  # Nombre
 
-        # NIF
         if company.tax_id:
             lines_count += 1
 
-        # Dirección envuelta (en 8)
         addr_parts = [
             company.address_line1,
             company.address_line2,
@@ -175,13 +172,11 @@ def render_invoice_pdf(
         addr_lines = wrap_text(addr, max_width=box_w, font_size=8)
         lines_count += len(addr_lines)
 
-        # Email / teléfono (si caben)
         if company.email:
             lines_count += 1
         if company.phone:
             lines_count += 1
 
-        # Un pelín de aire
         return max(invoice_box_h, pad_top + (lines_count * line_h) + 6)
 
     def draw_header(y_pos: float, box_h: int = invoice_box_h) -> float:
@@ -192,7 +187,6 @@ def render_invoice_pdf(
         box_w = 320
         x = margin_x
 
-        # Ajustamos altura real según contenido (pero mantenemos mínimo)
         box_h = int(company_header_needed_height(box_w))
         top_y = y_pos
         bottom_y = top_y - box_h
@@ -202,18 +196,15 @@ def render_invoice_pdf(
 
         ty = top_y
 
-        # Nombre empresa
         pdf.setFont("Helvetica-Bold", 11)
         pdf.drawString(x, ty, company.name or "")
         ty -= 14
 
-        # NIF
         pdf.setFont("Helvetica", 9)
         if company.tax_id:
             pdf.drawString(x, ty, f"NIF: {company.tax_id}")
             ty -= 12
 
-        # Dirección (más ligera)
         addr_parts = [
             company.address_line1,
             company.address_line2,
@@ -229,7 +220,6 @@ def render_invoice_pdf(
             pdf.drawString(x, ty, line)
             ty -= 10
 
-        # Contacto (si cabe)
         pdf.setFont("Helvetica", 8)
         if company.email and ty > bottom_y + 10:
             pdf.drawString(x, ty, company.email)
@@ -241,13 +231,12 @@ def render_invoice_pdf(
         # línea separadora fina (ancla el header con el resto)
         pdf.setLineWidth(0.6)
         pdf.setStrokeColorRGB(0.75, 0.75, 0.75)
-        pdf.line(margin_x, bottom_y - 2, width - margin_x, bottom_y - 2)
+        pdf.line(margin_x, bottom_y + 8 , width - margin_x, bottom_y + 8)
 
-        # vuelve a negro por seguridad
         pdf.setStrokeColorRGB(0, 0, 0)
         pdf.setLineWidth(1)
 
-        return bottom_y - 8
+        return bottom_y - 4
 
     def draw_company_and_dates(y_pos: float, box_h: int) -> float:
         box_w = invoice_box_w
@@ -302,7 +291,7 @@ def render_invoice_pdf(
             addr_lines = wrap_text(addr, max_width=box_w - 2 * pad_x, font_size=9)
             lines.extend(addr_lines)
 
-        pdf.setLineWidth(0.)
+        pdf.setLineWidth(0.8)  # FIX: antes estaba 0. y el borde podía “desaparecer”
         pdf.setStrokeColorRGB(0.2, 0.2, 0.2)
         pdf.rect(box_x, box_y, box_w, box_h, stroke=1, fill=0)
 
@@ -331,20 +320,16 @@ def render_invoice_pdf(
         return y_pos - 14
 
     def header_block() -> float:
-        """Dibuja el header completo y devuelve el y para empezar la tabla."""
         y_top = height - 40
 
-        # Fila 2: calculamos altura común para Cliente y Factura (mismo rectángulo)
         client_w = width - 2 * margin_x - invoice_box_w - gap
         needed_client_h = client_box_needed_height(client_w)
         row2_h = max(needed_client_h, invoice_box_h)
 
-        # Company: cabecera limpia. La alineamos para que su bottom coincida con el bottom de la fila 2.
         company_h = int(company_header_needed_height(320))
         company_top = y_top - (row2_h - company_h)
         y_after_company = draw_header(company_top, box_h=company_h)
 
-        # Fila 2 debajo
         row2_top = y_after_company - 6
         y_after_client = draw_client_block(row2_top, box_h=int(row2_h))
         y_after_invoice = draw_company_and_dates(row2_top, box_h=int(row2_h))
@@ -374,32 +359,61 @@ def render_invoice_pdf(
         pdf.drawRightString(width - margin_x, start_y, f"{item['total']:.2f} €")
         y = start_y - needed_height
 
-    # Totales abajo a la derecha (pegado al final útil)
-    box_width = 180
-    box_height = 50
+
+    footer_y = 30
+
+    box_width = 190
+    box_height = 66
     box_x = width - box_width - margin_x
 
-    footer_y = 40
-    footer_gap = 12
-    bottom_limit = footer_y + footer_gap  # 52 (deja aire al footer centrado)
+    footer_gap = 22
+    bottom_limit = footer_y + footer_gap
 
-    box_y = bottom_limit + box_height  # top del box según bottom_limit
+    box_top = bottom_limit + box_height
+    box_y = box_top - box_height
 
-    pdf.setLineWidth(1)
-    pdf.setStrokeColorRGB(0, 0, 0)
-    pdf.rect(box_x, box_y - box_height, box_width, box_height, stroke=1, fill=0)
+    pdf.setLineWidth(0.8)
+    pdf.setStrokeColorRGB(0.2, 0.2, 0.2)
+    pdf.rect(box_x, box_y, box_width, box_height, stroke=1, fill=0)
+
+    pad_x = 10
+    y_cursor = box_top - 14
 
     pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(box_x + 8, box_y - 12, "Totales")
+    pdf.drawString(box_x + pad_x, y_cursor, "Totales")
+    y_cursor -= 16
 
     pdf.setFont("Helvetica", 10)
-    pdf.drawRightString(box_x + box_width - 8, box_y - 22, f"Base: {payload['totals']['subtotal']:.2f} €")
-    pdf.drawRightString(box_x + box_width - 8, box_y - 34, f"IGI: {payload['totals']['igi']:.2f} €")
+    pdf.drawRightString(
+        box_x + box_width - pad_x,
+        y_cursor,
+        f"Base: {payload['totals']['subtotal']:.2f} €",
+    )
+    y_cursor -= 14
+
+    pdf.drawRightString(
+        box_x + box_width - pad_x,
+        y_cursor,
+        f"IGI: {payload['totals']['igi']:.2f} €",
+    )
+    y_cursor -= 18
 
     pdf.setFont("Helvetica-Bold", 12)
-    pdf.drawRightString(box_x + box_width - 8, box_y - 42, f"TOTAL: {payload['totals']['total']:.2f} €")
+    pdf.drawRightString(
+        box_x + box_width - pad_x,
+        y_cursor,
+        f"TOTAL: {payload['totals']['total']:.2f} €",
+    )
 
     if payload.get("show_igi_exempt_footer"):
+        # Línea separadora antes del texto legal
+        pdf.setLineWidth(0.6)
+        pdf.setStrokeColorRGB(0.75, 0.75, 0.75)
+        pdf.line(margin_x, footer_y + 14, width - margin_x, footer_y + 14)
+
+        pdf.setStrokeColorRGB(0, 0, 0)
+        pdf.setLineWidth(1)
+
         pdf.setFont("Helvetica", 8)
         footer_text = (
             "Operació exempta de l’Impost General Indirecte, d’acord amb l’article 43 de la Llei 11/2012"
