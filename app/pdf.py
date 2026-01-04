@@ -145,65 +145,117 @@ def render_invoice_pdf(
 
         return max(min_h, pad_top + (lines_count * line_h) + 10)
 
-    def draw_header(y_pos: float, box_h: int = invoice_box_h) -> float:
-        # Company: SIEMPRE altura normal (no se estira) para que no “cuelgue”
-        box_h = invoice_box_h
-
-        box_w = 320
-        box_x = margin_x
-        box_y = y_pos - box_h
-
-        pad_x = 8
-        pad_top = 14
+    def company_header_needed_height(box_w: float) -> float:
+        """
+        Cabecera limpia (sin box). Calcula altura aproximada para que el layout no “cuelgue”.
+        """
+        pad_top = 0
         line_h = 10
 
-        if company:
-            pdf.setLineWidth(1)
-            pdf.setStrokeColorRGB(0, 0, 0)
-            pdf.rect(box_x, box_y, box_w, box_h, stroke=1, fill=0)
+        if not company:
+            return invoice_box_h
 
-            tx = box_x + pad_x
-            ty = box_y + box_h - pad_top
+        lines_count = 0
+        # Nombre
+        lines_count += 1
 
-            pdf.setFont("Helvetica-Bold", 11)
-            pdf.drawString(tx, ty, company.name or "")
+        # NIF
+        if company.tax_id:
+            lines_count += 1
+
+        # Dirección envuelta (en 8)
+        addr_parts = [
+            company.address_line1,
+            company.address_line2,
+            company.postal_code,
+            company.city,
+            company.country,
+        ]
+        addr = " ".join([p for p in addr_parts if p])
+        addr_lines = wrap_text(addr, max_width=box_w, font_size=8)
+        lines_count += len(addr_lines)
+
+        # Email / teléfono (si caben)
+        if company.email:
+            lines_count += 1
+        if company.phone:
+            lines_count += 1
+
+        # Un pelín de aire
+        return max(invoice_box_h, pad_top + (lines_count * line_h) + 6)
+
+    def draw_header(y_pos: float, box_h: int = invoice_box_h) -> float:
+        """
+        Company header SIN box: tipografía + jerarquía.
+        Devuelve el y debajo del bloque.
+        """
+        box_w = 320
+        x = margin_x
+
+        # Ajustamos altura real según contenido (pero mantenemos mínimo)
+        box_h = int(company_header_needed_height(box_w))
+        top_y = y_pos
+        bottom_y = top_y - box_h
+
+        if not company:
+            return bottom_y - 12
+
+        ty = top_y
+
+        # Nombre empresa
+        pdf.setFont("Helvetica-Bold", 11)
+        pdf.drawString(x, ty, company.name or "")
+        ty -= 14
+
+        # NIF
+        pdf.setFont("Helvetica", 9)
+        if company.tax_id:
+            pdf.drawString(x, ty, f"NIF: {company.tax_id}")
             ty -= 12
 
-            pdf.setFont("Helvetica", 9)
-            if company.tax_id:
-                pdf.drawString(tx, ty, f"NIF: {company.tax_id}")
-                ty -= line_h + 1
+        # Dirección (más ligera)
+        addr_parts = [
+            company.address_line1,
+            company.address_line2,
+            company.postal_code,
+            company.city,
+            company.country,
+        ]
+        addr = " ".join([p for p in addr_parts if p])
+        for line in wrap_text(addr, max_width=box_w, font_size=8):
+            if ty <= bottom_y + 10:
+                break
+            pdf.setFont("Helvetica", 8)
+            pdf.drawString(x, ty, line)
+            ty -= 10
 
-            addr_parts = [
-                company.address_line1,
-                company.address_line2,
-                company.postal_code,
-                company.city,
-                company.country,
-            ]
-            addr = " ".join([p for p in addr_parts if p])
-            for line in wrap_text(addr, max_width=box_w - 2 * pad_x, font_size=8):
-                if ty <= box_y + 10:
-                    break
-                pdf.drawString(tx, ty, line)
-                ty -= line_h
+        # Contacto (si cabe)
+        pdf.setFont("Helvetica", 8)
+        if company.email and ty > bottom_y + 10:
+            pdf.drawString(x, ty, company.email)
+            ty -= 10
+        if company.phone and ty > bottom_y + 10:
+            pdf.drawString(x, ty, f"Tel: {company.phone}")
+            ty -= 10
 
-            if company.email and ty > box_y + 10:
-                pdf.drawString(tx, ty, company.email)
-                ty -= line_h
-            if company.phone and ty > box_y + 10:
-                pdf.drawString(tx, ty, f"Tel: {company.phone}")
-                ty -= line_h
+        # línea separadora fina (ancla el header con el resto)
+        pdf.setLineWidth(0.6)
+        pdf.setStrokeColorRGB(0.75, 0.75, 0.75)
+        pdf.line(margin_x, bottom_y - 2, width - margin_x, bottom_y - 2)
 
-        return box_y - 12  # devuelve “debajo” del bloque
+        # vuelve a negro por seguridad
+        pdf.setStrokeColorRGB(0, 0, 0)
+        pdf.setLineWidth(1)
+
+        return bottom_y - 8
 
     def draw_company_and_dates(y_pos: float, box_h: int) -> float:
         box_w = invoice_box_w
         box_x = width - margin_x - box_w
         box_y = y_pos - box_h
 
-        pdf.setLineWidth(1)
-        pdf.setStrokeColorRGB(0, 0, 0)
+        pdf.setLineWidth(0.8)
+        pdf.setStrokeColorRGB(0.2, 0.2, 0.2)
         pdf.rect(box_x, box_y, box_w, box_h, stroke=1, fill=0)
 
         pad_x = 8
@@ -250,8 +302,8 @@ def render_invoice_pdf(
             addr_lines = wrap_text(addr, max_width=box_w - 2 * pad_x, font_size=9)
             lines.extend(addr_lines)
 
-        pdf.setLineWidth(1)
-        pdf.setStrokeColorRGB(0, 0, 0)
+        pdf.setLineWidth(0.)
+        pdf.setStrokeColorRGB(0.2, 0.2, 0.2)
         pdf.rect(box_x, box_y, box_w, box_h, stroke=1, fill=0)
 
         tx = box_x + pad_x
@@ -287,13 +339,13 @@ def render_invoice_pdf(
         needed_client_h = client_box_needed_height(client_w)
         row2_h = max(needed_client_h, invoice_box_h)
 
-        # Company: no se estira. Lo bajamos para que su bottom alinee con el bottom de la fila 2.
-        company_h = invoice_box_h
+        # Company: cabecera limpia. La alineamos para que su bottom coincida con el bottom de la fila 2.
+        company_h = int(company_header_needed_height(320))
         company_top = y_top - (row2_h - company_h)
         y_after_company = draw_header(company_top, box_h=company_h)
 
         # Fila 2 debajo
-        row2_top = y_after_company - 18
+        row2_top = y_after_company - 6
         y_after_client = draw_client_block(row2_top, box_h=int(row2_h))
         y_after_invoice = draw_company_and_dates(row2_top, box_h=int(row2_h))
 
